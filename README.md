@@ -12,7 +12,7 @@ Majik Buwiz helps freelancers, consultants, and small business owners create, si
 
 [![Majik Buwiz Thumbnail](https://github.com/user-attachments/assets/9e9b4efe-6997-4ab4-acaf-cf96763cc4ea)](https://apps.microsoft.com/detail/9mzz1gm9238r)
 
-> Click the image to try Majik Message live.
+> Click the image to try Majik Buwiz live.
 
 [Read Docs](https://majikah.solutions/products/majik-buwiz/docs)
 
