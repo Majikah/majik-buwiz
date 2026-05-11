@@ -8,6 +8,15 @@
 
 Majik Buwiz helps freelancers, consultants, and small business owners create, sign, share, and manage invoices — while keeping full control of their data and privacy. Every invoice is sealed with next-generation cryptography. Your data never leaves your device unless you choose to share it.
 
+<img width="3840" height="2160" alt="MajikBuwiz_SuperHero_4K" src="https://github.com/user-attachments/assets/9e9b4efe-6997-4ab4-acaf-cf96763cc4ea" />
+
+[Read more about Majik Buwiz here](https://majikah.solutions/products/majik-buwiz)
+
+[![Majik Buwiz Thumbnail](https://github.com/user-attachments/assets/9e9b4efe-6997-4ab4-acaf-cf96763cc4ea)](https://apps.microsoft.com/detail/9mzz1gm9238r)
+
+> Click the image to try Majik Message live.
+
+[Read Docs](https://majikah.solutions/products/majik-buwiz/docs)
 
 [![Majik Message Microsoft App Store](https://get.microsoft.com/images/en-us%20light.svg)](https://apps.microsoft.com/detail/9mzz1gm9238r)
 
