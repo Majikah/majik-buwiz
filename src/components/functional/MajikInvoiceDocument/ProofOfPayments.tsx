@@ -490,8 +490,10 @@ const ProofOfPaymentsBlockComponent: React.FC<ProofOfPaymentsBlockProps> = ({
 
                 <EntryMain>
                   <EntryMethodRow>
-                    <EntryMethod>{meta.label}</EntryMethod>
-                    <EntryRef title={pop.reference}>{pop.reference}</EntryRef>
+                    <EntryMethod data-private>{meta.label}</EntryMethod>
+                    <EntryRef title={pop.reference} data-private>
+                      {pop.reference}
+                    </EntryRef>
                   </EntryMethodRow>
                   <EntryMeta>
                     <EntryMetaItem>
@@ -503,6 +505,7 @@ const ProofOfPaymentsBlockComponent: React.FC<ProofOfPaymentsBlockProps> = ({
                         href={pop.proofUrl}
                         target="_blank"
                         rel="noopener noreferrer"
+                        data-private
                       >
                         <LinkSimpleIcon size={9} />
                         Proof
@@ -512,7 +515,7 @@ const ProofOfPaymentsBlockComponent: React.FC<ProofOfPaymentsBlockProps> = ({
                 </EntryMain>
 
                 <EntryAmountCol>
-                  <EntryAmount>
+                  <EntryAmount data-private>
                     {fmtAmount(pop.amount, pop.currency)}
                   </EntryAmount>
                   <EntrySettledBadge>
@@ -547,7 +550,7 @@ const ProofOfPaymentsBlockComponent: React.FC<ProofOfPaymentsBlockProps> = ({
       {payments.length > 1 && invoiceTotal !== undefined && (
         <SummaryRow>
           <SummaryLabel>Total paid</SummaryLabel>
-          <SummaryAmount $overpaid={totalPaid > invoiceTotal}>
+          <SummaryAmount $overpaid={totalPaid > invoiceTotal} data-private>
             {fmtAmount(totalPaid, invoiceCurrency)}
             {totalPaid > invoiceTotal && " (overpaid)"}
           </SummaryAmount>

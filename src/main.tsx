@@ -16,7 +16,6 @@ import CrispIdentify from "./lib/crisp/CrispIdentify";
 
 import LogRocketInit from "./lib/log-rocket/LogRocketInit";
 
-
 const worker = new Worker(new URL("./sqlite-worker.ts", import.meta.url), {
   type: "module",
 });

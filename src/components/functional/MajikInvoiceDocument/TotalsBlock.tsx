@@ -179,13 +179,13 @@ const TotalsBlockComponent: React.FC<TotalsBlockProps> = ({ invoice }) => {
     <Block>
       <Row>
         <Label>Subtotal</Label>
-        <Value>{fmt(totals.subtotalAmount, currency)}</Value>
+        <Value data-private>{fmt(totals.subtotalAmount, currency)}</Value>
       </Row>
 
       {invoice.hasDiscount && (
         <Row>
           <Label $variant="discount">Discount</Label>
-          <Value $variant="discount">
+          <Value $variant="discount" data-private>
             −{fmt(totals.discountTotalAmount, currency)}
           </Value>
         </Row>
@@ -198,26 +198,26 @@ const TotalsBlockComponent: React.FC<TotalsBlockProps> = ({ invoice }) => {
             {t.inclusive && " (incl.)"}
           </Label>
 
-          <Value>{fmt(t.taxAmount, currency)}</Value>
+          <Value data-private>{fmt(t.taxAmount, currency)}</Value>
         </Row>
       ))}
 
       <Row $grand>
         <Label>Total</Label>
-        <Value>{fmt(totals.grandTotalAmount, currency)}</Value>
+        <Value data-private>{fmt(totals.grandTotalAmount, currency)}</Value>
       </Row>
 
       {withholdingTaxes.map((t) => (
         <Row key={`${t.taxType}-${t.jurisdiction ?? ""}`}>
           <Label $variant="tax">Less: {t.label ?? t.taxType}</Label>
-          <Value>−{fmt(t.taxAmount, currency)}</Value>
+          <Value data-private>−{fmt(t.taxAmount, currency)}</Value>
         </Row>
       ))}
 
       {invoice.hasWithholding && (
         <Row $grand>
           <Label>Net Payable</Label>
-          <Value>{fmt(totals.netPayableAmount, currency)}</Value>
+          <Value data-private>{fmt(totals.netPayableAmount, currency)}</Value>
         </Row>
       )}
 
@@ -242,14 +242,14 @@ const TotalsBlockComponent: React.FC<TotalsBlockProps> = ({ invoice }) => {
           <PaymentRow>
             <PaymentLabel>Amount Paid</PaymentLabel>
 
-            <PaymentValue>{invoice.totalPaid.format()}</PaymentValue>
+            <PaymentValue data-private>{invoice.totalPaid.format()}</PaymentValue>
           </PaymentRow>
 
           {!invoice.isFullyPaid && (
             <PaymentRow>
               <PaymentLabel>Remaining Balance</PaymentLabel>
 
-              <PaymentValue $emphasis>
+              <PaymentValue $emphasis data-private>
                 {invoice.amountDue.format()}
               </PaymentValue>
             </PaymentRow>

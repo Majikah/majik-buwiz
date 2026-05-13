@@ -221,7 +221,7 @@ const InvoiceHeaderComponent: React.FC<InvoiceHeaderProps> = ({
     )}
     <HeaderRow>
       <BrandBlock>
-        <LogoMark>
+        <LogoMark data-private>
           {companyName
             .split(" ")
             .map((w) => w[0])

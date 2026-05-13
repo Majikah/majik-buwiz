@@ -414,7 +414,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = React.memo(
           </StatCell>
           <StatCell style={{ gridColumn: "1 / -1" }}>
             <StatLabel>Content hash (SHA-256)</StatLabel>
-            <MonoText>{invoice.integrity.contentHash}</MonoText>
+            <MonoText data-private>{invoice.integrity.contentHash}</MonoText>
           </StatCell>
           {isSealed && invoice.integrity.sealInfo && (
             <>
