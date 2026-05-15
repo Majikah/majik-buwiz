@@ -89,7 +89,7 @@ export const ReplaceKeyModal: React.FC<ReplaceKeyModalProps> = React.memo(
         isOpen={open}
         onOpenChange={onOpenChange}
         modal={{
-          title: "Switch to Matching Key",
+          title: "Switch to Another Key",
           description:
             "Import the backup for the key bound to your MUID. This will replace your current local account.",
         }}

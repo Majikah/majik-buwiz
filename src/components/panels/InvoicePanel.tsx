@@ -62,6 +62,7 @@ import { MajikInvoiceContact } from "@/SDK/majik-buwiz-client/src/core/party/maj
 import { useMajikah } from "../majikah-session-wrapper/use-majikah";
 import { SignerInfo } from "../functional/MajikInvoiceDocument/SignatureBlock";
 import { MajikBuwizDatabase } from "../majik-context-wrapper/majik-buwiz-database";
+import GuideHelper from "../functional/GuideHelper";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1421,6 +1422,12 @@ export const InvoicePanel = forwardRef<InvoicePanelHandle, InvoicePanelProps>(
           }}
         >
           <ConfigureBody>
+            {configMode === "signed-only" ? (
+              <GuideHelper docsPath="https://majikah.solutions/products/majik-buwiz/docs/buwiz-invoices-signing" />
+            ) : (
+              <GuideHelper docsPath="https://majikah.solutions/products/majik-buwiz/docs/buwiz-invoices-encryption" />
+            )}
+
             <ConfigSection>
               <ConfigLabel>Security Mode</ConfigLabel>
               <ModeToggle>

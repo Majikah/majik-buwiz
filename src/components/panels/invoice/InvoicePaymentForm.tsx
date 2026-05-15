@@ -573,11 +573,11 @@ export const InvoicePaymentForm: React.FC<InvoicePaymentFormProps> = ({
             {amountError ? (
               <ErrorHint>{amountError}</ErrorHint>
             ) : pctHint ? (
-              <HintText>{pctHint}</HintText>
+              <HintText data-private>{pctHint}</HintText>
             ) : null}
           </div>
           {amountRemaining !== undefined && (
-            <HintText>
+            <HintText data-private>
               Remaining: {invoiceCurrency}{" "}
               {amountRemaining.toLocaleString(undefined, {
                 minimumFractionDigits: 2,

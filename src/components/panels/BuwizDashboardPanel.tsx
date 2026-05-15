@@ -861,7 +861,7 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
 
   return (
     <Root id="section-dashboard">
-      <GuideHelper docsPath="https://majikah.solutions/products/majik-buwiz/docs/dashboard" />
+      <GuideHelper docsPath="https://majikah.solutions/products/majik-buwiz/docs/buwiz-dashboard-overview" />
 
       {/* ── Header ── */}
       <Header>

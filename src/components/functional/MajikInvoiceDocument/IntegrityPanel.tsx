@@ -19,6 +19,7 @@ import React, { useCallback, useState } from "react";
 import styled from "styled-components";
 import {
   CheckCircleIcon,
+  CopyIcon,
   FilePdfIcon,
   LockKeyIcon,
   PenNibIcon,
@@ -27,6 +28,8 @@ import {
 } from "@phosphor-icons/react";
 import type { MajikInvoice } from "@majikah/majik-invoice";
 import { CtrlBtn } from "@/globals/buttons";
+import { toast } from "sonner";
+import { jsonToBase64 } from "@/utils/utils";
 
 // ---------------------------------------------------------------------------
 // Styled
@@ -125,6 +128,10 @@ const SigMeta = styled.div`
 const SigRight = styled.div`
   text-align: right;
   flex-shrink: 0;
+  gap: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 `;
 
 const SigTime = styled.div`
@@ -205,6 +212,26 @@ const CryptoControls = styled.div`
   padding-top: ${({ theme }) => theme.spacing.medium};
   border-top: 1px solid ${({ theme }) => theme.colors.primary}12;
 `;
+
+const FieldCopyBtn = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  opacity: 0.3;
+  flex-shrink: 0;
+  &:hover {
+    opacity: 0.8;
+  }
+  margin-left: 5px;
+`;
+
+const copyToClipboard = (text: string, label = "Copied") => {
+  navigator.clipboard
+    .writeText(text)
+    .then(() => toast.success(label, { duration: 1500 }));
+};
 
 // ---------------------------------------------------------------------------
 // Props
@@ -381,11 +408,13 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = React.memo(
         <IntegrityGrid>
           <StatCell>
             <StatLabel>Mode</StatLabel>
-            <StatValue data-private>{invoice.mode}</StatValue>
+            <StatValue data-private>{invoice.mode.toUpperCase()}</StatValue>
           </StatCell>
           <StatCell>
             <StatLabel>Status</StatLabel>
-            <StatValue data-private>{invoice.integrityStatus}</StatValue>
+            <StatValue data-private>
+              {invoice.integrityStatus.toUpperCase()}
+            </StatValue>
           </StatCell>
           <StatCell>
             <StatLabel>Signatures</StatLabel>
@@ -402,19 +431,29 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = React.memo(
             <StatLabel>Seal</StatLabel>
             <StatValue data-private>
               {isSealed
-                ? `sealed${
+                ? `SEALED${
                     invoice.integrity.sealInfo?.sealTimestamp
                       ? ` · ${new Date(
                           invoice.integrity.sealInfo.sealTimestamp,
                         ).toLocaleDateString()}`
                       : ""
                   }`
-                : "unsealed"}
+                : "UNSEALED"}
             </StatValue>
           </StatCell>
           <StatCell style={{ gridColumn: "1 / -1" }}>
             <StatLabel>Content hash (SHA-256)</StatLabel>
             <MonoText data-private>{invoice.integrity.contentHash}</MonoText>
+            <FieldCopyBtn
+              onClick={() =>
+                copyToClipboard(
+                  invoice.integrity.contentHash,
+                  "Content Hash copied",
+                )
+              }
+            >
+              <CopyIcon size={12} />
+            </FieldCopyBtn>
           </StatCell>
           {isSealed && invoice.integrity.sealInfo && (
             <>
@@ -429,6 +468,16 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = React.memo(
                 <MonoText data-private>
                   {invoice.integrity.sealInfo.sealHash}
                 </MonoText>
+                <FieldCopyBtn
+                  onClick={() =>
+                    copyToClipboard(
+                      invoice.integrity.sealInfo!.sealHash,
+                      "Seal Hash copied",
+                    )
+                  }
+                >
+                  <CopyIcon size={12} />
+                </FieldCopyBtn>
               </StatCell>
             </>
           )}
@@ -456,6 +505,19 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = React.memo(
                   <SigTime data-private>
                     {new Date(sig.timestamp).toLocaleString()}
                   </SigTime>
+                  <CtrlBtn
+                    onClick={() =>
+                      copyToClipboard(
+                        jsonToBase64({
+                          hash: invoice.integrity.contentHash,
+                          signature: sig,
+                        }),
+                        "Signature copied",
+                      )
+                    }
+                  >
+                    Copy Signature
+                  </CtrlBtn>
                 </SigRight>
               </SigRow>
             ))

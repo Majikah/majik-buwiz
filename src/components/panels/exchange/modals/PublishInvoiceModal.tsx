@@ -20,6 +20,7 @@ import { MajikInvoice } from "@majikah/majik-invoice";
 import { ExchangePublishSearchBar } from "../ExchangePublishSearchBar";
 import { ExchangeSearchResults } from "../ExchangeSearchResults";
 import MajikRecipientSelector from "@/components/MajikRecipientSelector";
+import GuideHelper from "@/components/functional/GuideHelper";
 
 // ---------------------------------------------------------------------------
 // Publish modal styled
@@ -67,7 +68,6 @@ export const PublishInvoiceModal: React.FC<PublishInvoiceModalProps> =
         new Set(),
       );
 
-    
       const [configRecipients, setConfigRecipients] = useState<
         MajikInvoiceContact[]
       >(() => {
@@ -187,6 +187,8 @@ export const PublishInvoiceModal: React.FC<PublishInvoiceModalProps> =
           }}
         >
           <PublishModalBody>
+            <GuideHelper docsPath="https://majikah.solutions/products/majik-buwiz/docs/buwiz-exchange-send" />
+
             {/* Recipient selector */}
 
             <MajikRecipientSelector

@@ -102,6 +102,7 @@ const DynamicPopUp: React.FC<DynamicPopUpProps> = ({
                 textProceedButton={buttons.confirm.text}
                 hideButtonA={buttons.cancel.hide}
                 hideButtonB={buttons.confirm.hide}
+                heightOffset={160}
               >
                 {[children]}
               </ScrollableForm>

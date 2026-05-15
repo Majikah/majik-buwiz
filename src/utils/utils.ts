@@ -1428,3 +1428,23 @@ export function base64Decode(base64: string): string {
   const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
   return new TextDecoder().decode(bytes);
 }
+
+
+export function jsonToBase64<T>(data: T): string {
+  const json = JSON.stringify(data);
+  const bytes = new TextEncoder().encode(json);
+
+  let binary = "";
+  bytes.forEach((b) => (binary += String.fromCharCode(b)));
+
+  return btoa(binary);
+}
+
+export function base64ToJson<T>(base64: string): T {
+  const binary = atob(base64);
+
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  const json = new TextDecoder().decode(bytes);
+
+  return JSON.parse(json) as T;
+}

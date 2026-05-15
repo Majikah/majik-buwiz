@@ -154,7 +154,7 @@ const DEFAULT_COLUMNS: InvoiceColumnDef[] = [
     sortValue: (inv) =>
       inv.public?.invoiceNumber ?? safeInvoice(inv)?.invoiceNumber ?? inv.id,
     render: (inv) => (
-      <InvoiceNumber>
+      <InvoiceNumber data-private>
         {inv.public?.invoiceNumber ??
           safeInvoice(inv)?.invoiceNumber ??
           inv.id.slice(0, 10)}
@@ -171,7 +171,7 @@ const DEFAULT_COLUMNS: InvoiceColumnDef[] = [
     render: (inv) => {
       const name =
         inv.public?.issuerName ?? safeInvoice(inv)?.issuer?.legalName;
-      return <CellText>{name ?? <Muted>—</Muted>}</CellText>;
+      return <CellText data-private>{name ?? <Muted>—</Muted>}</CellText>;
     },
   },
   {
@@ -184,7 +184,11 @@ const DEFAULT_COLUMNS: InvoiceColumnDef[] = [
     render: (inv) => {
       const name =
         safeInvoice(inv)?.recipient?.legalName ?? inv.public.recipientName;
-      return <CellText>{name ?? <Redacted>Encrypted</Redacted>}</CellText>;
+      return (
+        <CellText data-private>
+          {name ?? <Redacted>Encrypted</Redacted>}
+        </CellText>
+      );
     },
   },
   {
@@ -197,7 +201,9 @@ const DEFAULT_COLUMNS: InvoiceColumnDef[] = [
       `${inv.displayStatus} ${inv.isLocked ? "" : `- ${inv.status}`}`,
     render: (inv) => {
       return (
-        <StatusBadge $color={statusColor(inv.status)}>{inv.status}</StatusBadge>
+        <StatusBadge $color={statusColor(inv.status)} data-private>
+          {inv.status}
+        </StatusBadge>
       );
     },
   },
@@ -230,7 +236,7 @@ const DEFAULT_COLUMNS: InvoiceColumnDef[] = [
         return null;
       }
     },
-    render: (inv) => <AmountCell>{fmtAmount(inv)}</AmountCell>,
+    render: (inv) => <AmountCell data-private>{fmtAmount(inv)}</AmountCell>,
   },
   {
     key: "issueDate",
@@ -242,7 +248,7 @@ const DEFAULT_COLUMNS: InvoiceColumnDef[] = [
       return d ? new Date(d).getTime() : null;
     },
     render: (inv) => (
-      <DateCell>{fmtDate(safeInvoice(inv)?.issueDate)}</DateCell>
+      <DateCell data-private>{fmtDate(safeInvoice(inv)?.issueDate)}</DateCell>
     ),
   },
   {
@@ -254,7 +260,9 @@ const DEFAULT_COLUMNS: InvoiceColumnDef[] = [
       const d = safeInvoice(inv)?.dueDate;
       return d ? new Date(d).getTime() : null;
     },
-    render: (inv) => <DateCell>{fmtDate(safeInvoice(inv)?.dueDate)}</DateCell>,
+    render: (inv) => (
+      <DateCell data-private>{fmtDate(safeInvoice(inv)?.dueDate)}</DateCell>
+    ),
   },
   {
     key: "sealed",
@@ -783,7 +791,7 @@ const Pagination: React.FC<PaginationProps> = ({
   const pages = buildPageNumbers(page, totalPages);
 
   return (
-    <PaginationBar $position={position}>
+    <PaginationBar $position={position} id="pagination-invoices">
       <PageInfo>
         {totalItems === 0 ? "No invoices" : `${start}–${end} of ${totalItems}`}
       </PageInfo>
@@ -938,7 +946,7 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
   };
 
   return (
-    <Root>
+    <Root id="table-invoices">
       {showTop && <Pagination {...paginationProps} position="top" />}
 
       <BulkBar $visible={selectedCount > 0}>
@@ -968,9 +976,9 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
 
       <TableScroll>
         <Table>
-          <THead>
+          <THead id="table-invoices-header">
             <tr>
-              <CheckboxTh>
+              <CheckboxTh id="table-invoices-col-checkbox">
                 <Checkbox
                   ref={selectAllRef}
                   checked={allPageSelected}
@@ -1005,7 +1013,11 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
                 </Th>
               ))}
 
-              <Th $align="right" $minWidth="120px">
+              <Th
+                $align="right"
+                $minWidth="120px"
+                id="table-invoices-col-actions"
+              >
                 Actions
               </Th>
             </tr>

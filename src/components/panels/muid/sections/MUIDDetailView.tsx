@@ -67,6 +67,7 @@ import {
   SectionAction,
   tierGradient,
 } from "../../shared/atoms";
+import GuideHelper from "@/components/functional/GuideHelper";
 
 // ─── Local styled ──────────────────────────────────────────────────────────────
 
@@ -955,6 +956,10 @@ export const MUIDDetailView: React.FC<MUIDDetailViewProps> = React.memo(
 
     return (
       <>
+        <GuideHelper
+          docsPath="https://majikah.solutions/products/majik-buwiz/docs/buwiz-muid-setup"
+          id="guide-user-muid-panel"
+        />
         {/* Hero */}
         <HeroCard>
           <HeroTop>

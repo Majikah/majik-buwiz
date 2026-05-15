@@ -526,47 +526,116 @@ function App(): JSX.Element {
     );
   }
 
-  const tabs: RouterTabContent[] = [
-    {
-      id: "accounts",
-      route: "/accounts",
-      icon: IdentificationCardIcon,
-      name: "Majik Universal ID",
-      element: <UserMUIDPanel majik={majik} onUpdate={handleRefreshInstance} />,
-    },
+  const activeAccount = useMemo(() => {
+    return majik.getActiveAccount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [majik, refreshKey]);
 
-    {
-      id: "contacts",
-      route: "/contacts",
-      name: "Contacts",
-      icon: AddressBookIcon,
-      element: <ContactsPanel majik={majik} onUpdate={handleRefreshInstance} />,
-    },
+  const tabs: RouterTabContent[] = useMemo(() => {
+    if (!activeAccount) {
+      return [
+        {
+          id: "accounts",
+          route: "/accounts",
+          icon: IdentificationCardIcon,
+          name: "Majik Universal ID",
+          element: (
+            <UserMUIDPanel majik={majik} onUpdate={handleRefreshInstance} />
+          ),
+        },
+      ];
+    }
 
-    {
-      id: "dashboard",
-      route: "/dashboard",
-      name: "Dashboard",
-      icon: ChartLineUpIcon,
-      element: <BuwizDashboardPanel majik={majik} />,
-    },
+    return [
+      {
+        id: "accounts",
+        route: "/accounts",
+        icon: IdentificationCardIcon,
+        name: "Majik Universal ID",
+        element: (
+          <UserMUIDPanel majik={majik} onUpdate={handleRefreshInstance} />
+        ),
+      },
 
-    {
-      id: "invoices",
-      route: "/invoices",
-      name: "My Invoices",
-      icon: ReceiptIcon,
-      element: <InvoicesManager majik={majik} />,
-    },
+      {
+        id: "contacts",
+        route: "/contacts",
+        name: "Contacts",
+        icon: AddressBookIcon,
+        element: (
+          <ContactsPanel majik={majik} onUpdate={handleRefreshInstance} />
+        ),
+      },
 
-    {
-      id: "exchange",
-      route: "/exchange",
-      name: "Exchange",
-      icon: BankIcon,
-      element: <InvoiceExchangePanel majik={majik} />,
-    },
-  ];
+      {
+        id: "dashboard",
+        route: "/dashboard",
+        name: "Dashboard",
+        icon: ChartLineUpIcon,
+        element: <BuwizDashboardPanel majik={majik} />,
+      },
+
+      {
+        id: "invoices",
+        route: "/invoices",
+        name: "My Invoices",
+        icon: ReceiptIcon,
+        element: <InvoicesManager majik={majik} />,
+      },
+
+      {
+        id: "exchange",
+        route: "/exchange",
+        name: "Exchange",
+        icon: BankIcon,
+        element: <InvoiceExchangePanel majik={majik} />,
+      },
+    ];
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAccount, refreshKey]);
+
+  // const tabs: RouterTabContent[] = [
+  //   {
+  //     id: "accounts",
+  //     route: "/accounts",
+  //     icon: IdentificationCardIcon,
+  //     name: "Majik Universal ID",
+  //     element: <UserMUIDPanel majik={majik} onUpdate={handleRefreshInstance} />,
+  //   },
+
+  //   {
+  //     id: "contacts",
+  //     route: "/contacts",
+  //     name: "Contacts",
+  //     icon: AddressBookIcon,
+  //     element: <ContactsPanel majik={majik} onUpdate={handleRefreshInstance} />,
+  //   },
+
+  //   {
+  //     id: "dashboard",
+  //     route: "/dashboard",
+  //     name: "Dashboard",
+  //     icon: ChartLineUpIcon,
+  //     element: <BuwizDashboardPanel majik={majik} />,
+  //   },
+
+  //   {
+  //     id: "invoices",
+  //     route: "/invoices",
+  //     name: "My Invoices",
+  //     icon: ReceiptIcon,
+  //     element: <InvoicesManager majik={majik} />,
+  //   },
+
+  //   {
+  //     id: "exchange",
+  //     route: "/exchange",
+  //     name: "Exchange",
+  //     icon: BankIcon,
+  //     element: <InvoiceExchangePanel majik={majik} />,
+  //   },
+  // ];
 
   return (
     <RootContainer>

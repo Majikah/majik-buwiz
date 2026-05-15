@@ -314,6 +314,8 @@ export interface CustomFormInputProps {
   layout?: "stack" | "row";
   /** When type='boolean' and useToggle=true, a toggle switch UI will be shown instead of a checkbox. */
   useToggle?: boolean;
+
+  hideCharLimit?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -337,6 +339,7 @@ export const CustomFormInput: React.FC<CustomFormInputProps> = ({
   id: idProp,
   layout = "stack",
   useToggle = false,
+  hideCharLimit = false,
 }) => {
   const uid = useId();
   const fieldId = idProp ?? uid;
@@ -586,7 +589,7 @@ export const CustomFormInput: React.FC<CustomFormInputProps> = ({
             </ControlColumn>
           </LabelRow>
 
-          {maxChar > 0 && (
+          {maxChar > 0 && !hideCharLimit && (
             <CharCount $exceeded={isExceeded}>
               {charCount}/{maxChar}
             </CharCount>
@@ -606,7 +609,7 @@ export const CustomFormInput: React.FC<CustomFormInputProps> = ({
 
         <InputWrap>{textArea}</InputWrap>
 
-        {maxChar > 0 && (
+        {maxChar > 0 && !hideCharLimit && (
           <CharCount $exceeded={isExceeded}>
             {charCount}/{maxChar}
           </CharCount>
@@ -649,7 +652,7 @@ export const CustomFormInput: React.FC<CustomFormInputProps> = ({
             )}
           </ControlColumn>
         </LabelRow>
-        {maxChar > 0 && (
+        {maxChar > 0 && !hideCharLimit && (
           <CharCount $exceeded={isExceeded}>
             {charCount}/{maxChar}
           </CharCount>
@@ -680,7 +683,7 @@ export const CustomFormInput: React.FC<CustomFormInputProps> = ({
           data-private
         />
       </InputWrap>
-      {maxChar > 0 && (
+      {maxChar > 0 && !hideCharLimit && (
         <CharCount $exceeded={isExceeded}>
           {charCount}/{maxChar}
         </CharCount>

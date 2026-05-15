@@ -557,7 +557,7 @@ export const InvoiceSearchBar: React.FC<InvoiceSearchBarProps> = ({
   return (
     <Bar>
       {/* ── Search input ── */}
-      <SearchWrap>
+      <SearchWrap id="input-invoices-search">
         <SearchIconWrap>
           <MagnifyingGlassIcon size={13} />
         </SearchIconWrap>
@@ -577,7 +577,7 @@ export const InvoiceSearchBar: React.FC<InvoiceSearchBarProps> = ({
       <Divider />
 
       {/* ── Status filters ── */}
-      <FilterGroup>
+      <FilterGroup id="toolbar-invoices-filters">
         <FilterLabel>
           <FunnelIcon size={10} weight="fill" />
           Status
@@ -641,7 +641,7 @@ export const InvoiceSearchBar: React.FC<InvoiceSearchBarProps> = ({
       <Divider />
 
       {/* ── Column visibility ── */}
-      <PopoverAnchor ref={popoverRef}>
+      <PopoverAnchor ref={popoverRef} id="button-invoices-column-visibility">
         <ColumnToggleBtn
           $active={colPopoverOpen || hiddenColumnCount > 0}
           onClick={() => setColPopoverOpen((v) => !v)}

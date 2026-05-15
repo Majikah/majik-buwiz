@@ -31,6 +31,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { downloadBlob } from "@/utils/utils";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { sendNotification } from "@tauri-apps/plugin-notification";
+import GuideHelper from "@/components/functional/GuideHelper";
 
 // ---------------------------------------------------------------------------
 // Group metadata
@@ -671,6 +672,7 @@ export const CSVExportDialog: React.FC<CSVExportDialogProps> = ({
           </DialogHeader>
 
           <Body>
+            <GuideHelper docsPath="https://majikah.solutions/products/majik-buwiz/docs/buwiz-invoices-export" />
             {/* ── Preset strip ── */}
             <PresetStrip>
               <PresetLabel>Preset:</PresetLabel>

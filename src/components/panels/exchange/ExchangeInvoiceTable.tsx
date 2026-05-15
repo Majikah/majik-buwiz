@@ -141,15 +141,13 @@ const fmtAmount = (inv: MajikInvoice): string => {
 };
 
 const copyToClipboard = (text: string, label = "Copied") => {
-  navigator.clipboard
-    .writeText(text)
-    .then(() =>
-      toast.success(label, {
-        duration: 1500,
-        description: text,
-        id: `toast-copy-${text}`,
-      }),
-    );
+  navigator.clipboard.writeText(text).then(() =>
+    toast.success(label, {
+      duration: 1500,
+      description: text,
+      id: `toast-copy-${text}`,
+    }),
+  );
 };
 
 const statusColor = (status?: string | null): string => {
@@ -1125,8 +1123,8 @@ export const ExchangeInvoiceTable: React.FC<ExchangeInvoiceTableProps> =
                             onClick={() => onView(inv)}
                             style={{ cursor: "pointer" }}
                           >
-                            <PartyName title={party}>{party}</PartyName>
-                            <PartySub>{currency}</PartySub>
+                            <PartyName title={party} data-private>{party}</PartyName>
+                            <PartySub data-private>{currency}</PartySub>
                           </Td>
 
                           {/* Invoice number */}
@@ -1134,7 +1132,7 @@ export const ExchangeInvoiceTable: React.FC<ExchangeInvoiceTableProps> =
                             onClick={() => onView(inv)}
                             style={{ cursor: "pointer" }}
                           >
-                            <InvNum>
+                            <InvNum data-private>
                               {pub(inv).invoiceNumber ?? inv.id?.slice(0, 10)}
                             </InvNum>
                           </Td>
@@ -1147,11 +1145,11 @@ export const ExchangeInvoiceTable: React.FC<ExchangeInvoiceTableProps> =
                           {/* Status — from public */}
                           <Td>
                             {status ? (
-                              <StatusPill $color={statusColor(status)}>
+                              <StatusPill $color={statusColor(status)} data-private>
                                 {status}
                               </StatusPill>
                             ) : (
-                              <StatusPill $color={statusColor(undefined)}>
+                              <StatusPill $color={statusColor(undefined)} data-private>
                                 unknown
                               </StatusPill>
                             )}
@@ -1164,6 +1162,7 @@ export const ExchangeInvoiceTable: React.FC<ExchangeInvoiceTableProps> =
                               handleCopyClipboard(inv.public.totalAmount)
                             }
                             style={{ cursor: "pointer" }}
+                            data-private
                           >
                             <AmountText>{fmtAmount(inv)}</AmountText>
                           </Td>

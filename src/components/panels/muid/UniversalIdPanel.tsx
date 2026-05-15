@@ -1435,9 +1435,7 @@ export const UniversalIdPanel: React.FC<UniversalIdPanelProps> = ({
       });
       setSessionStatus(session.data.status);
       setVerificationUrl(session.data.verification_url);
-   open(
-        session.data.verification_url
-      );
+      open(session.data.verification_url);
       toast.success("Verification session started", {
         description: "Complete your identity verification in the new tab.",
       });
@@ -1620,9 +1618,7 @@ export const UniversalIdPanel: React.FC<UniversalIdPanelProps> = ({
             {verificationUrl && (
               <VerifyBtn
                 $variant="primary"
-                onClick={() =>
-                 open(verificationUrl)
-                }
+                onClick={() => open(verificationUrl)}
               >
                 <ArrowSquareOutIcon size={11} /> Continue in Didit
               </VerifyBtn>

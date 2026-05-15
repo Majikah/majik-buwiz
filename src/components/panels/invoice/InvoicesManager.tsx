@@ -27,6 +27,7 @@ import {
   ArrowClockwiseIcon,
   ArrowLeftIcon,
   DownloadSimpleIcon,
+  LockKeyIcon,
   PlusIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react";
@@ -43,6 +44,9 @@ import { StatusQuickActions } from "./InvoiceStatusQuickActions";
 import { MajikBuwizDatabase } from "@/components/majik-context-wrapper/majik-buwiz-database";
 import { toast } from "sonner";
 import CSVExportDialog from "./CSVExportDialog";
+import { CtrlBtn } from "@/globals/buttons";
+import { launchTourMyInvoices } from "@/lib/shepherd-js/tutorials/tutorial-my-invoices";
+import { useShepherd } from "@/lib/shepherd-js/use-shepherd";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -372,6 +376,7 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
   paginationAt,
   isAdmin = true,
 }) => {
+  const tour = useShepherd();
   // ── Invoice list ──────────────────────────────────────────────────────────
 
   const [invoices, setInvoices] = useState<MajikInvoice[]>([]);
@@ -843,6 +848,50 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
     }
   }, [activeInvoice, majik]);
 
+  const handleSwitchSignedOnly = useCallback(async () => {
+    const invoice = activeInvoice;
+    if (!invoice) return;
+
+    setIsTransitioning(true);
+    try {
+      const result = await majik.switchInvoiceMode(
+        invoice,
+        "signed-only",
+        undefined,
+        { dropSignatures: false },
+      );
+      setActiveInvoice(result);
+      toast.success("Invoice is now Signed Only.");
+    } catch (err) {
+      console.error("[handleSwitchSignedOnly] failed:", err);
+      toast.error(err instanceof Error ? err.message : "Mode switch failed.");
+    } finally {
+      setIsTransitioning(false);
+    }
+  }, [activeInvoice, majik]);
+
+  const handleSwitchEncrypted = useCallback(async () => {
+    const invoice = activeInvoice;
+    if (!invoice) return;
+
+    setIsTransitioning(true);
+    try {
+      const result = await majik.switchInvoiceMode(
+        invoice,
+        "encrypted-and-signed",
+        undefined,
+        { dropSignatures: false },
+      );
+      setActiveInvoice(result);
+      toast.success("Invoice is now Encrypted and Signed.");
+    } catch (err) {
+      console.error("[handleSwitchEncrypted] failed:", err);
+      toast.error(err instanceof Error ? err.message : "Mode switch failed.");
+    } finally {
+      setIsTransitioning(false);
+    }
+  }, [activeInvoice, majik]);
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const toolbarTitle = useMemo(() => {
@@ -907,13 +956,19 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
 
   return (
     <Root id="section-invoices">
-      <GuideHelper docsPath="https://majikah.solutions/products/majik-buwiz/docs/invoice-management" />
-
+      {mode === "list" ? (
+        <GuideHelper
+          docsPath="https://majikah.solutions/products/majik-buwiz/docs/buwiz-invoices-search-filter"
+          startTour={() => launchTourMyInvoices(tour)}
+        />
+      ) : (
+        <GuideHelper docsPath="https://majikah.solutions/products/majik-buwiz/docs/buwiz-invoices-create-edit" />
+      )}
       {/* ── Header ── */}
       <PanelHeader>
         <HeaderLeft>
           <PanelTitle>{toolbarTitle}</PanelTitle>
-          <PanelSubtitle>{listSubtitle}</PanelSubtitle>
+          <PanelSubtitle id="badge-invoices-count">{listSubtitle}</PanelSubtitle>
         </HeaderLeft>
 
         <HeaderActions>
@@ -933,6 +988,26 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
                 onSync={handleSync}
               />
             )}
+
+          {/* ── Quick mode switching ── */}
+          {mode !== "list" &&
+            activeInvoice &&
+            (activeInvoice.isEncrypted ? (
+              <>
+                <CtrlBtn $variant="ghost" onClick={handleSwitchSignedOnly}>
+                  <LockKeyIcon size={13} weight="bold" />
+                  Switch to Signed Only
+                </CtrlBtn>
+              </>
+            ) : (
+              <>
+                <CtrlBtn $variant="ghost" onClick={handleSwitchEncrypted}>
+                  <LockKeyIcon size={13} weight="bold" />
+                  Switch to Encrypted
+                </CtrlBtn>
+              </>
+            ))}
+
           {mode !== "list" && (
             <BackButton onClick={handleBack}>
               <ArrowLeftIcon size={13} weight="bold" />
@@ -967,16 +1042,17 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
               <ExportButton
                 onClick={handleExportAll}
                 title="Export all invoices to CSV"
+                id="button-invoices-export-csv"
               >
                 <DownloadSimpleIcon size={13} />
                 Export CSV
               </ExportButton>
 
-              <IconButton onClick={loadInvoices} title="Refresh list">
+              <IconButton onClick={loadInvoices} title="Refresh list" id="button-invoices-refresh">
                 <ArrowClockwiseIcon size={13} />
               </IconButton>
 
-              <NewInvoiceButton onClick={handleNewInvoice}>
+              <NewInvoiceButton onClick={handleNewInvoice} id="button-invoices-new">
                 <PlusIcon size={13} weight="bold" />
                 New Invoice
               </NewInvoiceButton>

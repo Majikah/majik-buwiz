@@ -1,13 +1,13 @@
 // sqlite-worker.ts
 import { sqlite3Worker1Promiser } from "@sqlite.org/sqlite-wasm";
-import { MAJIKAH_SQL_SCHEMA_FULL } from "./SDK/majik-buwiz-client/src";
+import { MAJIKAH_SQL_SCHEMA_FULL_V_1 } from "./SDK/majik-buwiz-client/src";
 
 let promiser: any = null;
 let dbId: string | null = null;
 let ready = false;
 const queue: MessageEvent[] = [];
 
-const SCHEMA = MAJIKAH_SQL_SCHEMA_FULL;
+const SCHEMA = MAJIKAH_SQL_SCHEMA_FULL_V_1;
 
 async function handleMessage(e: MessageEvent) {
   const { id, type, sql, params } = e.data;

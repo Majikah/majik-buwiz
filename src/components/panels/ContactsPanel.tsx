@@ -697,7 +697,7 @@ const ContactsPanel: React.FC<ContactsPanelProps> = ({ majik, onUpdate }) => {
   return (
     <Root id="section-contacts">
       <GuideHelper
-        docsPath="https://majikah.solutions/products/majik-buwiz/docs/contacts-documentation"
+        docsPath="https://majikah.solutions/products/majik-buwiz/docs/buwiz-contacts-overview"
         startTour={() => launchTutorialContacts(tour)}
       />
 

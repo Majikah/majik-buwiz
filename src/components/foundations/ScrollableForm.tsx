@@ -1,9 +1,9 @@
-import React, { type ReactNode } from 'react'
-import styled from 'styled-components'
+import React, { type ReactNode } from "react";
+import styled from "styled-components";
 
-import DuoButton from './DuoButton'
-import { isDevEnvironment } from '../../utils/utils'
-import { ButtonPrimaryConfirm } from '../../globals/buttons'
+import DuoButton from "./DuoButton";
+import { isDevEnvironment } from "../../utils/utils";
+import { ButtonPrimaryConfirm } from "../../globals/buttons";
 
 // Styled component for the frosted glass effect and full space usage
 const RootContainer = styled.div`
@@ -13,9 +13,9 @@ const RootContainer = styled.div`
 
   height: auto;
   user-select: none;
-`
+`;
 
-const ScrollContainer = styled.div`
+const ScrollContainer = styled.div<{ $offset?: number }>`
   width: inherit;
   -webkit-overflow-scrolling: touch; // IMPORTANT for iOS
   touch-action: pan-y; // Allows drag scroll
@@ -24,7 +24,7 @@ const ScrollContainer = styled.div`
   height: 100%;
 
   padding: 1rem 50px;
-  max-height: calc(85vh - 60px);
+  max-height: calc(85vh - ${({ $offset }) => ($offset ? $offset : 60)}px);
   overflow-y: auto;
 
   &::-webkit-scrollbar {
@@ -40,28 +40,29 @@ const ScrollContainer = styled.div`
     background: ${({ theme }) => theme.gradients.primary};
     border-radius: 8px;
   }
-`
+`;
 
 // Type definition for the props
 interface ScrollableFormProps {
-  children: ReactNode
-  textCancelButton?: string
-  textProceedButton?: string
-  onClickCancel: () => void
-  onClickProceed: () => void
-  isDisabledCancel?: boolean
-  isDisabledProceed?: boolean
-  hideButtonA?: boolean
-  hideButtonB?: boolean
-  onDebug?: () => void
-  confirmationText?: string
+  children: ReactNode;
+  textCancelButton?: string;
+  textProceedButton?: string;
+  onClickCancel: () => void;
+  onClickProceed: () => void;
+  isDisabledCancel?: boolean;
+  isDisabledProceed?: boolean;
+  hideButtonA?: boolean;
+  hideButtonB?: boolean;
+  onDebug?: () => void;
+  confirmationText?: string;
+  heightOffset?: number;
 }
 
 // Stateless functional component
 const ScrollableForm: React.FC<ScrollableFormProps> = ({
   children,
-  textCancelButton = 'Cancel',
-  textProceedButton = 'Proceed',
+  textCancelButton = "Cancel",
+  textProceedButton = "Proceed",
   onClickCancel,
   onClickProceed,
   isDisabledCancel = false,
@@ -69,11 +70,12 @@ const ScrollableForm: React.FC<ScrollableFormProps> = ({
   hideButtonA = false,
   hideButtonB = false,
   onDebug,
-  confirmationText = 'Are you sure you want to proceed with this action?'
+  confirmationText = "Are you sure you want to proceed with this action?",
+  heightOffset = 60,
 }) => {
   return (
     <RootContainer>
-      <ScrollContainer>{children}</ScrollContainer>
+      <ScrollContainer $offset={heightOffset}>{children}</ScrollContainer>
 
       <DuoButton
         textButtonA={textCancelButton}
@@ -88,10 +90,12 @@ const ScrollableForm: React.FC<ScrollableFormProps> = ({
         confirmationText={confirmationText}
       />
       {isDevEnvironment() && !!onDebug && (
-        <ButtonPrimaryConfirm onClick={onDebug}>View Class Instance</ButtonPrimaryConfirm>
+        <ButtonPrimaryConfirm onClick={onDebug}>
+          View Class Instance
+        </ButtonPrimaryConfirm>
       )}
     </RootContainer>
-  )
-}
+  );
+};
 
-export default ScrollableForm
+export default ScrollableForm;

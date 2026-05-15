@@ -15,6 +15,7 @@ import {
   DialogOverlay,
   DialogTitle,
 } from "@/globals/styled-dialogs";
+import GuideHelper from "@/components/functional/GuideHelper";
 
 // =============================================================================
 // Types
@@ -335,6 +336,7 @@ export const InvoicePDFExportDialog: React.FC<InvoicePDFExportDialogProps> = ({
           </DialogHeader>
 
           <Body>
+            <GuideHelper docsPath="https://majikah.solutions/products/majik-buwiz/docs/buwiz-invoices-export" />
             <PresetStrip>
               <PresetLabel>Preset:</PresetLabel>
 

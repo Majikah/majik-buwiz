@@ -2,6 +2,8 @@ import React from "react";
 import styled, { css } from "styled-components";
 import { fmt } from "./LineItemsTable";
 import type { GeneralInvoice } from "@majikah/majik-invoice";
+import { toast } from "sonner";
+import { CopyIcon } from "@phosphor-icons/react";
 
 // ---------------------------------------------------------------------------
 // Styled
@@ -152,6 +154,26 @@ const PaymentValue = styled.span<{ $emphasis?: boolean }>`
     $emphasis ? theme.colors.textPrimary : theme.colors.textSecondary};
 `;
 
+const FieldCopyBtn = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  opacity: 0.3;
+  flex-shrink: 0;
+  &:hover {
+    opacity: 0.8;
+  }
+  margin-left: 5px;
+`;
+
+const copyToClipboard = (text: string, label = "Copied") => {
+  navigator.clipboard
+    .writeText(text)
+    .then(() => toast.success(label, { duration: 1500 }));
+};
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -179,7 +201,20 @@ const TotalsBlockComponent: React.FC<TotalsBlockProps> = ({ invoice }) => {
     <Block>
       <Row>
         <Label>Subtotal</Label>
-        <Value data-private>{fmt(totals.subtotalAmount, currency)}</Value>
+        <Value data-private>
+          {fmt(totals.subtotalAmount, currency)}
+
+          <FieldCopyBtn
+            onClick={() =>
+              copyToClipboard(
+                totals.subtotalAmount.toString(),
+                "Subtotal copied",
+              )
+            }
+          >
+            <CopyIcon size={12} />
+          </FieldCopyBtn>
+        </Value>
       </Row>
 
       {invoice.hasDiscount && (
@@ -187,6 +222,16 @@ const TotalsBlockComponent: React.FC<TotalsBlockProps> = ({ invoice }) => {
           <Label $variant="discount">Discount</Label>
           <Value $variant="discount" data-private>
             −{fmt(totals.discountTotalAmount, currency)}
+            <FieldCopyBtn
+              onClick={() =>
+                copyToClipboard(
+                  totals.discountTotalAmount.toString(),
+                  "Discount copied",
+                )
+              }
+            >
+              <CopyIcon size={12} />
+            </FieldCopyBtn>
           </Value>
         </Row>
       )}
@@ -198,26 +243,75 @@ const TotalsBlockComponent: React.FC<TotalsBlockProps> = ({ invoice }) => {
             {t.inclusive && " (incl.)"}
           </Label>
 
-          <Value data-private>{fmt(t.taxAmount, currency)}</Value>
+          <Value data-private>
+            {fmt(t.taxAmount, currency)}
+
+            <FieldCopyBtn
+              onClick={() =>
+                copyToClipboard(
+                  t.taxAmount.toString(),
+                  `${t.label || t.taxType} copied`,
+                )
+              }
+            >
+              <CopyIcon size={12} />
+            </FieldCopyBtn>
+          </Value>
         </Row>
       ))}
 
       <Row $grand>
         <Label>Total</Label>
-        <Value data-private>{fmt(totals.grandTotalAmount, currency)}</Value>
+        <Value data-private>
+          {fmt(totals.grandTotalAmount, currency)}{" "}
+          <FieldCopyBtn
+            onClick={() =>
+              copyToClipboard(
+                totals.grandTotalAmount.toString(),
+                "Total Grand Amount copied",
+              )
+            }
+          >
+            <CopyIcon size={12} />
+          </FieldCopyBtn>
+        </Value>
       </Row>
 
       {withholdingTaxes.map((t) => (
         <Row key={`${t.taxType}-${t.jurisdiction ?? ""}`}>
           <Label $variant="tax">Less: {t.label ?? t.taxType}</Label>
-          <Value data-private>−{fmt(t.taxAmount, currency)}</Value>
+          <Value data-private>
+            −{fmt(t.taxAmount, currency)}
+            <FieldCopyBtn
+              onClick={() =>
+                copyToClipboard(
+                  t.taxAmount.toString(),
+                  `${t.label || t.taxType} copied`,
+                )
+              }
+            >
+              <CopyIcon size={12} />
+            </FieldCopyBtn>
+          </Value>
         </Row>
       ))}
 
       {invoice.hasWithholding && (
         <Row $grand>
           <Label>Net Payable</Label>
-          <Value data-private>{fmt(totals.netPayableAmount, currency)}</Value>
+          <Value data-private>
+            {fmt(totals.netPayableAmount, currency)}
+            <FieldCopyBtn
+              onClick={() =>
+                copyToClipboard(
+                  totals.netPayableAmount.toString(),
+                  "Net Payable copied",
+                )
+              }
+            >
+              <CopyIcon size={12} />
+            </FieldCopyBtn>
+          </Value>
         </Row>
       )}
 
@@ -242,7 +336,19 @@ const TotalsBlockComponent: React.FC<TotalsBlockProps> = ({ invoice }) => {
           <PaymentRow>
             <PaymentLabel>Amount Paid</PaymentLabel>
 
-            <PaymentValue data-private>{invoice.totalPaid.format()}</PaymentValue>
+            <PaymentValue data-private>
+              {invoice.totalPaid.format()}
+              <FieldCopyBtn
+                onClick={() =>
+                  copyToClipboard(
+                    invoice.totalPaid.toMajor().toString(),
+                    "Amount Paid copied",
+                  )
+                }
+              >
+                <CopyIcon size={12} />
+              </FieldCopyBtn>
+            </PaymentValue>
           </PaymentRow>
 
           {!invoice.isFullyPaid && (
@@ -251,6 +357,16 @@ const TotalsBlockComponent: React.FC<TotalsBlockProps> = ({ invoice }) => {
 
               <PaymentValue $emphasis data-private>
                 {invoice.amountDue.format()}
+                <FieldCopyBtn
+                  onClick={() =>
+                    copyToClipboard(
+                      invoice.amountDue.toMajor().toString(),
+                      "Remaining Balance copied",
+                    )
+                  }
+                >
+                  <CopyIcon size={12} />
+                </FieldCopyBtn>
               </PaymentValue>
             </PaymentRow>
           )}

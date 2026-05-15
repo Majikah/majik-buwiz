@@ -1,4 +1,3 @@
-
 /**
  * UserMUIDPanel.tsx  (refactored)
  *
@@ -39,9 +38,11 @@ import { open } from "@tauri-apps/plugin-shell";
 
 import {
   ArrowsClockwiseIcon,
+  ArrowsLeftRightIcon,
   CheckCircleIcon,
   DownloadIcon,
   IdentificationCardIcon,
+  PencilIcon,
   ShareIcon,
   SignInIcon,
   SignOutIcon,
@@ -570,7 +571,7 @@ const UserMUIDPanel: React.FC<UserMUIDPanelProps> = ({
   return (
     <Root>
       <GuideHelper
-        docsPath="https://majikah.solutions/products/majik-buwiz/docs/muid"
+        docsPath="https://majikah.solutions/products/majik-buwiz/docs/buwiz-muid-manage"
         id="guide-user-muid-panel"
       />
 
@@ -582,6 +583,24 @@ const UserMUIDPanel: React.FC<UserMUIDPanelProps> = ({
           </PanelTitle>
         </HeaderLeft>
         <HeaderActions>
+          {currentAccount && (
+            <IconBtn
+              onClick={() => handleOpenEditMeta(currentAccount.meta)}
+              title="Edit"
+            >
+              <PencilIcon size={13} />
+            </IconBtn>
+          )}
+
+          {currentAccount && (
+            <IconBtn
+              onClick={() => setShowReplaceKeyModal(true)}
+              title="Switch Account"
+            >
+              <ArrowsLeftRightIcon size={13} />
+            </IconBtn>
+          )}
+
           {uid && (
             <>
               <IconBtn onClick={refresh} title="Refresh" disabled={muidLoading}>

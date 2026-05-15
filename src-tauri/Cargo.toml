@@ -1,6 +1,6 @@
 [package]
 name = "majik-buwiz-desktop"
-version = "0.1.1"
+version = "0.1.2"
 description = "Post-Quantum Invoice Management for modern businesses — secure, offline-first, and just like magic."
 authors = ["Majik Information Technology Solutions"]
 edition = "2021"

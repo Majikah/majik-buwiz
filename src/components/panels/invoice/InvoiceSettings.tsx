@@ -17,6 +17,7 @@ import type { InvoiceDefaults } from "@/SDK/majik-buwiz-client/src/core/storage/
 import type { TaxDetail } from "@majikah/majik-invoice";
 import { PaymentTermsPicker } from "@/components/functional/MajikInvoiceDocument/PaymentTermsPicker";
 import ConfirmationButton from "@/components/foundations/ConfirmationButton";
+import CustomFormInput from "@/components/foundations/CustomFormInput";
 
 // ── Styled ────────────────────────────────────────────────────────────────
 
@@ -432,11 +433,14 @@ export const InvoiceSettings: React.FC<InvoiceSettingsProps> = ({
             <UserIcon size={12} /> Issuer
           </SectionLabel>
           <FieldRow>
-            <FieldLabel>Legal Name</FieldLabel>
-            <Input
+            <CustomFormInput
+              label="Legal Name"
+              onChange={(e) => setIssuerField("legalName", e as string)}
               value={form.issuer?.legalName ?? ""}
-              onChange={(e) => setIssuerField("legalName", e.target.value)}
+              required
               placeholder="Your company name"
+              maxChar={200}
+              hideCharLimit
             />
           </FieldRow>
           <FieldRow>

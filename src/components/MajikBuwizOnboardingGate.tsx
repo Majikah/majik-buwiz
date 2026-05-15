@@ -62,6 +62,7 @@ import { MajikBytes } from "@majikah/majik-bytes";
 import JSZip from "jszip";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
+import CustomFormInput from "./foundations/CustomFormInput";
 
 // ─── Animations ───────────────────────────────────────────────────────────────
 
@@ -294,63 +295,6 @@ const FormGroup = styled.div`
   display: flex;
   flex-direction: column;
   gap: 5px;
-`;
-
-const FormLabel = styled.label`
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: ${({ theme }) => theme.colors.textSecondary};
-  opacity: 0.5;
-`;
-
-const FormInput = styled.input`
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid ${({ theme }) => theme.colors.secondaryBackground};
-  border-radius: 8px;
-  font-size: 12px;
-  color: ${({ theme }) => theme.colors.textPrimary};
-  background: ${({ theme }) => theme.colors.secondaryBackground};
-  transition: all 0.15s;
-  box-sizing: border-box;
-
-  &:focus {
-    outline: none;
-    border-color: ${({ theme }) => theme.colors.primary || "#E05C1A"};
-    background: ${({ theme }) => theme.colors.primaryBackground};
-  }
-
-  &::placeholder {
-    color: ${({ theme }) => theme.colors.textSecondary};
-    opacity: 0.35;
-  }
-`;
-
-const FormTextarea = styled.textarea`
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid ${({ theme }) => theme.colors.secondaryBackground};
-  border-radius: 8px;
-  font-size: 12px;
-  color: ${({ theme }) => theme.colors.textPrimary};
-  background: ${({ theme }) => theme.colors.secondaryBackground};
-  transition: all 0.15s;
-  box-sizing: border-box;
-  resize: vertical;
-  min-height: 60px;
-
-  &:focus {
-    outline: none;
-    border-color: ${({ theme }) => theme.colors.primary || "#E05C1A"};
-    background: ${({ theme }) => theme.colors.primaryBackground};
-  }
-
-  &::placeholder {
-    color: ${({ theme }) => theme.colors.textSecondary};
-    opacity: 0.35;
-  }
 `;
 
 const SectionSubhead = styled.div`
@@ -1774,26 +1718,29 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
 
                     <FormRow>
                       <FormGroup>
-                        <FormLabel>Tax ID (TIN)</FormLabel>
-                        <FormInput
-                          value={invoiceMeta.tin ?? ""}
+                        <CustomFormInput
+                          label="Tax ID (TIN)"
                           onChange={(e) =>
-                            setInvoiceMetaField("tin", e.target.value)
+                            setInvoiceMetaField("tin", e as string)
                           }
+                          value={invoiceMeta.tin ?? ""}
+                          required
                           placeholder="000-000-000-000"
+                          maxChar={25}
+                          hideCharLimit
                         />
                       </FormGroup>
                       <FormGroup>
-                        <FormLabel>Nature of Business</FormLabel>
-                        <FormInput
-                          value={invoiceMeta.natureOfBusiness ?? ""}
+                        <CustomFormInput
+                          label="Nature of Business"
                           onChange={(e) =>
-                            setInvoiceMetaField(
-                              "natureOfBusiness",
-                              e.target.value,
-                            )
+                            setInvoiceMetaField("natureOfBusiness", e as string)
                           }
+                          value={invoiceMeta.natureOfBusiness ?? ""}
+                          required
                           placeholder="e.g. Freelance Services"
+                          maxChar={100}
+                          hideCharLimit
                         />
                       </FormGroup>
                     </FormRow>
@@ -1803,38 +1750,44 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
 
                     <FormRow>
                       <FormGroup>
-                        <FormLabel>Email</FormLabel>
-                        <FormInput
+                        <CustomFormInput
                           type="email"
                           value={invoiceMeta.email ?? ""}
                           onChange={(e) =>
-                            setInvoiceMetaField("email", e.target.value)
+                            setInvoiceMetaField("email", e as string)
                           }
                           placeholder="billing@example.com"
+                          label="Email"
+                          maxChar={100}
+                          hideCharLimit
                         />
                       </FormGroup>
                       <FormGroup>
-                        <FormLabel>Phone</FormLabel>
-                        <FormInput
-                          type="tel"
+                        <CustomFormInput
+                          label="Phone"
+                          type="number"
                           value={invoiceMeta.phone ?? ""}
                           onChange={(e) =>
-                            setInvoiceMetaField("phone", e.target.value)
+                            setInvoiceMetaField("phone", e as string)
                           }
-                          placeholder="+63 9XX XXX XXXX"
+                          placeholder="63 9XX XXX XXXX"
+                          maxChar={25}
+                          hideCharLimit
                         />
                       </FormGroup>
                     </FormRow>
 
                     <FormGroup>
-                      <FormLabel>Website (optional)</FormLabel>
-                      <FormInput
+                      <CustomFormInput
+                        label="Website"
                         type="url"
                         value={invoiceMeta.website ?? ""}
                         onChange={(e) =>
-                          setInvoiceMetaField("website", e.target.value)
+                          setInvoiceMetaField("website", e as string)
                         }
                         placeholder="https://yoursite.com"
+                        maxChar={100}
+                        hideCharLimit
                       />
                     </FormGroup>
 
@@ -1842,14 +1795,16 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                     <SectionSubhead>Invoice Notes (optional)</SectionSubhead>
 
                     <FormGroup>
-                      <FormLabel>Default Notes</FormLabel>
-                      <FormTextarea
+                      <CustomFormInput
+                        label="Default Notes"
+                        type="paragraph"
                         value={invoiceMeta.notes ?? ""}
-                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                          setInvoiceMetaField("notes", e.target.value)
+                        onChange={(e) =>
+                          setInvoiceMetaField("notes", e as string)
                         }
                         placeholder="Payment terms, bank details, thank-you note…"
-                        style={{ resize: "vertical", minHeight: 60 }}
+                        maxChar={2500}
+                        layout="stack"
                       />
                     </FormGroup>
                   </FormGrid>

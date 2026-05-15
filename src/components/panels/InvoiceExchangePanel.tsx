@@ -55,6 +55,7 @@ import {
 import { DisputeInvoiceModal } from "./exchange/modals/DisputeInvoiceModal";
 import { useMajikah } from "../majikah-session-wrapper/use-majikah";
 import UserAuth from "../foundations/UserAuth";
+import GuideHelper from "../functional/GuideHelper";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -122,6 +123,14 @@ const NavRail = styled.nav`
 `;
 
 const NavHeader = styled.div`
+  width: 100%;
+`;
+
+const NavHeaderRow = styled.div`
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
   padding: 16px 16px 14px;
   border-bottom: 1px solid ${({ theme }) => theme.colors.primary}10;
 `;
@@ -1126,10 +1135,13 @@ export const InvoiceExchangePanel: React.FC<InvoiceExchangePanelProps> = ({
     <Root>
       {/* Nav Rail */}
       <NavRail>
-        <NavHeader>
-          <NavTitle>Exchange</NavTitle>
-          <NavSubtitle>Majikah Network</NavSubtitle>
-        </NavHeader>
+        <NavHeaderRow>
+          <NavHeader>
+            <NavTitle>Exchange </NavTitle>
+            <NavSubtitle>Majikah Network</NavSubtitle>
+          </NavHeader>
+          <GuideHelper docsPath="https://majikah.solutions/products/majik-buwiz/docs/buwiz-exchange-overview" />
+        </NavHeaderRow>
 
         <PublishBtn onClick={() => setModalKey("publish")}>
           <PlusIcon size={13} weight="bold" />

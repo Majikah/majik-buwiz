@@ -1499,7 +1499,7 @@ export const MajikUniversalIDSetup: React.FC<MajikUniversalIDSetupProps> = ({
   return (
     <Root>
       <GuideHelper
-        docsPath="https://majikah.solutions/products/majik-buwiz/docs/muid-setup"
+        docsPath="https://majikah.solutions/products/majik-buwiz/docs/buwiz-muid-setup"
         // startTour={() => launchTutorialAccounts(tour)}
         id="guide-muid-setup"
       />

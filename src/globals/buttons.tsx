@@ -229,11 +229,12 @@ export const CtrlBtn = styled.button<{
         `;
       case "success":
         return css`
-          background: ${theme.colors.brand.green}18;
-          border: 1px solid ${theme.colors.brand.green}44;
+
+          border: 1px solid ${theme.colors.brand.green};
           color: ${theme.colors.brand.green};
           &:hover:not(:disabled) {
-            background: ${theme.colors.brand.green}28;
+            background: ${theme.colors.brand.green};
+            color: ${theme.colors.textPrimary};
           }
         `;
       case "danger":
