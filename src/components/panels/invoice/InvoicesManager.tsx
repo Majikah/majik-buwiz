@@ -27,6 +27,7 @@ import {
   ArrowClockwiseIcon,
   ArrowLeftIcon,
   DownloadSimpleIcon,
+  GearIcon,
   LockKeyIcon,
   PlusIcon,
   WarningCircleIcon,
@@ -47,10 +48,24 @@ import CSVExportDialog from "./CSVExportDialog";
 import { CtrlBtn } from "@/globals/buttons";
 import { launchTourMyInvoices } from "@/lib/shepherd-js/tutorials/tutorial-my-invoices";
 import { useShepherd } from "@/lib/shepherd-js/use-shepherd";
+import InvoicePDFExportDialog, {
+  InvoicePDFExportOptions,
+} from "./InvoicePDFExportDialog";
+import { downloadMajikInvoicePDF } from "@/components/functional/MajikInvoiceDocument/MajikInvoicePDF";
+import JSZip from "jszip";
+import { sendNotification } from "@tauri-apps/plugin-notification";
+import { downloadBlob } from "@/utils/utils";
+import { writeFile } from "@tauri-apps/plugin-fs";
+import { save } from "@tauri-apps/plugin-dialog";
+import { InvoiceSettingsModal } from "./modals/InvoiceSettingsModal";
+
+import StyledIconButton from "@/components/foundations/StyledIconButton";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+type ModalKeyContext = "export-pdf" | "export-csv" | "invoice-settings" | null;
 
 type ManagerMode = "list" | "view" | "edit" | "new" | "duplicate";
 
@@ -412,7 +427,10 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
 
   const panelRef = useRef<InvoicePanelHandle>(null);
 
-  const [csvDialogOpen, setCsvDialogOpen] = useState(false);
+  const [modalKey, setModalKey] = useState<ModalKeyContext>(null);
+
+  const [pdfInvoices, setPdfInvoices] = useState<MajikInvoice[]>([]);
+
   const [csvScope, setCsvScope] = useState<"all" | "selected">("all");
   const [csvInvoices, setCsvInvoices] = useState<MajikInvoice[]>([]);
   const [selectedInvoicesForExport, setSelectedInvoicesForExport] = useState<
@@ -616,6 +634,10 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
     setMode("new");
   }, []);
 
+  const handleInvoiceSettings = useCallback(() => {
+    setModalKey("invoice-settings");
+  }, []);
+
   const handleDuplicate = useCallback(async (inv: MajikInvoice) => {
     try {
       const source = await majik.duplicateInvoice(inv);
@@ -772,17 +794,149 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
     setDeleteTarget(null);
   }, []);
 
-  const handleExportAll = useCallback(() => {
+  const handleExportCSVAll = useCallback(() => {
     setCsvInvoices(filteredInvoices);
     setCsvScope("all");
-    setCsvDialogOpen(true);
+    setModalKey("export-csv");
   }, [filteredInvoices]);
 
-  const handleExportSelected = useCallback((selected: MajikInvoice[]) => {
-    setCsvInvoices(selected);
-    setCsvScope("selected");
-    setCsvDialogOpen(true);
-  }, []);
+  const handleExportSelected = useCallback(
+    async (mode: "csv" | "pdf" | "mjki", selected: MajikInvoice[]) => {
+      switch (mode) {
+        case "csv": {
+          setCsvInvoices(selected);
+          setCsvScope("selected");
+          setModalKey("export-csv");
+          return;
+        }
+        case "pdf": {
+          setPdfInvoices(selected);
+          setModalKey("export-pdf");
+          return;
+        }
+
+        case "mjki": {
+          const activeAccount = majik.getActiveAccount();
+
+          if (!activeAccount) return;
+
+          try {
+            const defaultFileName = `${activeAccount.meta.legalName} - ${
+              activeAccount.meta.tin || activeAccount.id
+            } - Invoice`;
+
+            // If only one invoice, export directly
+            if (selected.length === 1) {
+              const invoice = selected[0];
+
+              const mjkiArrayBuffer = invoice.toBinary();
+
+              const invoiceFileName = `${invoice.public.issuerName} - ${
+                invoice.invoice.issuer.tin || activeAccount.id
+              } - ${invoice.public.invoiceNumber} - Invoice`;
+
+              const filePath = await save({
+                defaultPath: invoiceFileName,
+                filters: [{ name: "Majik Invoice", extensions: ["mjki"] }],
+              });
+
+              const blob = new Blob([mjkiArrayBuffer], {
+                type: "application/vnd.majikah.invoice",
+              });
+
+              if (!filePath) {
+                downloadBlob(blob, "mjki", invoiceFileName);
+              } else {
+                await writeFile(filePath, new Uint8Array(mjkiArrayBuffer));
+              }
+
+              toast.success("Invoice Exported", {
+                description: `${invoiceFileName} exported successfully.`,
+              });
+
+              sendNotification({
+                title: "Invoice Exported",
+                body: `${invoiceFileName} exported successfully.`,
+              });
+
+              return;
+            }
+
+            // Multiple invoices → ZIP export
+            const zip = new JSZip();
+
+            for (const invoice of selected) {
+              const mjkiArrayBuffer = invoice.toBinary();
+
+              // TODO: Replace this placeholder with your actual invoice filename logic
+              const invoiceFileName = `INVOICE_FILENAME_PLACEHOLDER.mjki`;
+
+              zip.file(invoiceFileName, mjkiArrayBuffer);
+            }
+
+            const zipBlob = await zip.generateAsync({
+              type: "blob",
+              compression: "DEFLATE",
+              compressionOptions: { level: 9 },
+            });
+
+            const filePath = await save({
+              defaultPath: `${defaultFileName}.zip`,
+              filters: [{ name: "MJKI ZIP", extensions: ["zip"] }],
+            });
+
+            if (!filePath) {
+              downloadBlob(zipBlob, "zip", defaultFileName);
+            } else {
+              const ab = await zipBlob.arrayBuffer();
+              await writeFile(filePath, new Uint8Array(ab));
+            }
+
+            toast.success("Invoices Exported", {
+              description: `${invoices.length} invoices exported successfully.`,
+            });
+
+            sendNotification({
+              title: "Invoices Exported",
+              body: `${invoices.length} invoices exported successfully.`,
+            });
+          } catch (err) {
+            console.error("[MajikInvoiceDocument] MJKI export error:", err);
+
+            toast.error("Export Failed", {
+              description: "Failed to export MJKI invoice(s).",
+            });
+          }
+
+          return;
+        }
+        default:
+          return;
+      }
+    },
+    [],
+  );
+
+  // ── PDF export ────────────────────────────────────────────────────────────
+
+  const handleExportPDF = useCallback(
+    async (invoices: MajikInvoice[], options: InvoicePDFExportOptions) => {
+      try {
+        for (const invoice of invoices) {
+          await downloadMajikInvoicePDF({
+            majik: majik,
+            kind: "majik",
+            invoice,
+            options,
+          });
+        }
+      } catch (err) {
+        console.error("[InvoicesManager] PDF export error:", err);
+      } finally {
+      }
+    },
+    [pdfInvoices],
+  );
 
   const handleSync = useCallback(
     async (source: "local" | "cloud") => {
@@ -968,7 +1122,9 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
       <PanelHeader>
         <HeaderLeft>
           <PanelTitle>{toolbarTitle}</PanelTitle>
-          <PanelSubtitle id="badge-invoices-count">{listSubtitle}</PanelSubtitle>
+          <PanelSubtitle id="badge-invoices-count">
+            {listSubtitle}
+          </PanelSubtitle>
         </HeaderLeft>
 
         <HeaderActions>
@@ -1030,7 +1186,19 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
               {selectedInvoicesForExport.length > 0 && (
                 <ExportButton
                   onClick={() =>
-                    handleExportSelected(selectedInvoicesForExport)
+                    handleExportSelected("pdf", selectedInvoicesForExport)
+                  }
+                  title={`Download ${selectedInvoicesForExport.length} selected invoices as PDF`}
+                >
+                  <DownloadSimpleIcon size={13} />
+                  Download selected ({selectedInvoicesForExport.length})
+                </ExportButton>
+              )}
+
+              {selectedInvoicesForExport.length > 0 && (
+                <ExportButton
+                  onClick={() =>
+                    handleExportSelected("csv", selectedInvoicesForExport)
                   }
                   title={`Export ${selectedInvoicesForExport.length} selected invoices to CSV`}
                 >
@@ -1040,7 +1208,7 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
               )}
 
               <ExportButton
-                onClick={handleExportAll}
+                onClick={handleExportCSVAll}
                 title="Export all invoices to CSV"
                 id="button-invoices-export-csv"
               >
@@ -1048,14 +1216,30 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
                 Export CSV
               </ExportButton>
 
-              <IconButton onClick={loadInvoices} title="Refresh list" id="button-invoices-refresh">
+              <IconButton
+                onClick={loadInvoices}
+                title="Refresh list"
+                id="button-invoices-refresh"
+              >
                 <ArrowClockwiseIcon size={13} />
               </IconButton>
 
-              <NewInvoiceButton onClick={handleNewInvoice} id="button-invoices-new">
+              <NewInvoiceButton
+                onClick={handleNewInvoice}
+                id="button-invoices-new"
+              >
                 <PlusIcon size={13} weight="bold" />
                 New Invoice
               </NewInvoiceButton>
+
+              <StyledIconButton
+                icon={GearIcon}
+                id="button-invoice-settings"
+                onClick={handleInvoiceSettings}
+                size={24}
+                title="Invoice Settings: Configure your default invoice preferences."
+                aria-description="Configure your default invoice preferences."
+              />
             </>
           )}
         </HeaderActions>
@@ -1198,10 +1382,26 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
 
       <CSVExportDialog
         majik={majik}
-        isOpen={csvDialogOpen}
-        onOpenChange={setCsvDialogOpen}
+        isOpen={modalKey === "export-csv"}
+        onOpenChange={(change) => setModalKey(change ? "export-csv" : null)}
         invoices={csvInvoices}
         scope={csvScope}
+      />
+
+      {/* ── PDF export dialog ── */}
+      <InvoicePDFExportDialog
+        invoices={pdfInvoices}
+        onExport={handleExportPDF}
+        isOpen={modalKey === "export-pdf"}
+        onOpenChange={(change) => setModalKey(change ? "export-pdf" : null)}
+      />
+
+      <InvoiceSettingsModal
+        majik={majik}
+        onOpenChange={(change) =>
+          setModalKey(change ? "invoice-settings" : null)
+        }
+        open={modalKey === "invoice-settings"}
       />
     </Root>
   );

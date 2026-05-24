@@ -40,6 +40,7 @@ import { writeFile } from "@tauri-apps/plugin-fs";
 import { getPaymentTermMeta } from "./_utils";
 import { toast } from "sonner";
 import { InvoicePDFExportOptions } from "@/components/panels/invoice/InvoicePDFExportDialog";
+import { MajikBuwizDatabase } from "@/components/majik-context-wrapper/majik-buwiz-database";
 
 type InvoiceRenderOptions = {
   showSealBanner: boolean;
@@ -1057,11 +1058,17 @@ const PDFFooter: React.FC<{ invoiceNumber?: string; companyName: string }> = ({
 
 export type MajikInvoicePDFProps =
   | {
+      majik: MajikBuwizDatabase;
       kind: "draft";
       invoice: GeneralInvoice;
       options?: InvoicePDFExportOptions;
     }
-  | { kind: "majik"; invoice: MajikInvoice; options?: InvoicePDFExportOptions };
+  | {
+      majik: MajikBuwizDatabase;
+      kind: "majik";
+      invoice: MajikInvoice;
+      options?: InvoicePDFExportOptions;
+    };
 
 // ---------------------------------------------------------------------------
 // Main Document
@@ -1360,7 +1367,7 @@ export async function downloadMajikInvoicePDF(
   props: MajikInvoicePDFProps,
   filename?: string,
 ): Promise<void> {
-  const blob = await buildMajikInvoiceBlob(props);
+  let blob = await buildMajikInvoiceBlob(props);
 
   const filePath = await save({
     defaultPath: filename ?? buildFilename(props),
@@ -1372,6 +1379,24 @@ export async function downloadMajikInvoicePDF(
     toast.error("Download Cancelled");
     return;
   } else {
+    if (props.kind === "majik") {
+      const activeAccount = props.majik.getActiveAccountKey();
+      if (activeAccount) {
+        if (
+          props.invoice.integrity.signatures[0].signerId ===
+          activeAccount.fingerprint
+        ) {
+          const invoice = props.invoice;
+
+          const signedFile = await props.majik.signFile(blob, {
+            expectedSigners: invoice.integrity.expectedSigners,
+          });
+
+          blob = signedFile.blob;
+        }
+      }
+    }
+
     const arrayBuffer = await blob.arrayBuffer();
     await writeFile(filePath, new Uint8Array(arrayBuffer));
   }

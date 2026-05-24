@@ -47,11 +47,12 @@ import type {
   InvoiceType,
   InvoiceStatus,
   ProofOfPayment,
+  Party,
 } from "@majikah/majik-invoice";
 import { downloadMajikInvoicePDF } from "./MajikInvoicePDF";
 import { ProofOfPaymentsBlock } from "./ProofOfPayments";
 import { CtrlBtn } from "@/globals/buttons";
-import { debounce } from "@/utils/utils";
+import { debounce, downloadBlob } from "@/utils/utils";
 import { SignatureBlock, SignerInfo } from "./SignatureBlock";
 
 import InvoicePDFExportDialog, {
@@ -65,6 +66,10 @@ import { NotesTags } from "./NotesTags";
 import IssuerCloseBlock from "./IssuerCloseBlock";
 import { computeDueDateFromTerm } from "./_utils";
 import { MajikBuwizDatabase } from "@/components/majik-context-wrapper/majik-buwiz-database";
+import { sendNotification } from "@tauri-apps/plugin-notification";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeFile } from "@tauri-apps/plugin-fs";
+import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Styled — Document Shell
@@ -516,7 +521,7 @@ export const MajikInvoiceDocument: React.FC<MajikInvoiceDocumentProps> = (
   );
 
   const handleRecipientChange = useCallback(
-    (patch: Partial<any>) => {
+    (patch: Partial<Party>) => {
       const recipient = latestInvoiceRef.current?.recipient ?? {
         ...generalInvoice?.recipient,
       };
@@ -524,7 +529,7 @@ export const MajikInvoiceDocument: React.FC<MajikInvoiceDocumentProps> = (
         recipient: {
           ...recipient,
           ...patch,
-          legalName: recipient.legalName || "",
+          legalName: patch?.legalName || recipient.legalName || "",
         },
       });
     },
@@ -590,13 +595,19 @@ export const MajikInvoiceDocument: React.FC<MajikInvoiceDocumentProps> = (
       try {
         if (isDraft) {
           await downloadMajikInvoicePDF({
+            majik: props.majik,
             kind: "draft",
             invoice: props.invoice as GeneralInvoice,
             options,
           });
         } else {
           for (const invoice of invoices) {
-            await downloadMajikInvoicePDF({ kind: "majik", invoice, options });
+            await downloadMajikInvoicePDF({
+              majik: props.majik,
+              kind: "majik",
+              invoice,
+              options,
+            });
           }
         }
       } catch (err) {
@@ -608,6 +619,62 @@ export const MajikInvoiceDocument: React.FC<MajikInvoiceDocumentProps> = (
     [isDraft, props.invoice],
   );
 
+  // ── MJKI export ────────────────────────────────────────────────────────────
+
+  const handleExportMJKI = useCallback(async () => {
+    setBusy("pdf");
+
+    const activeAccount = props.majik.getActiveAccount();
+
+    if (!activeAccount) return;
+    if (isDraft) return;
+
+    try {
+      // If only one invoice, export directly
+
+      const invoice = props.invoice;
+
+      const mjkiArrayBuffer = invoice.toBinary();
+
+      const invoiceFileName = `${invoice.public.issuerName} - ${
+        invoice.invoice.issuer.tin || activeAccount.id
+      } - ${invoice.public.invoiceNumber} - Invoice`;
+
+      const filePath = await save({
+        defaultPath: invoiceFileName,
+        filters: [{ name: "Majik Invoice", extensions: ["mjki"] }],
+      });
+
+      const blob = new Blob([mjkiArrayBuffer], {
+        type: "application/vnd.majikah.invoice",
+      });
+
+      if (!filePath) {
+        downloadBlob(blob, "mjki", invoiceFileName);
+      } else {
+        await writeFile(filePath, new Uint8Array(mjkiArrayBuffer));
+      }
+
+      toast.success("Invoice Exported", {
+        description: `${invoiceFileName} exported successfully.`,
+      });
+
+      sendNotification({
+        title: "Invoice Exported",
+        body: `${invoiceFileName} exported successfully.`,
+      });
+
+      return;
+    } catch (err) {
+      console.error("[MajikInvoiceDocument] MJKI export error:", err);
+
+      toast.error("Export Failed", {
+        description: "Failed to export MJKI invoice(s).",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }, [isDraft, props.invoice]);
   // ── Decrypt (needed in the encrypted overlay, not just IntegrityPanel) ────
 
   const handleDecryptOverlay = useCallback(async () => {
@@ -873,6 +940,7 @@ export const MajikInvoiceDocument: React.FC<MajikInvoiceDocumentProps> = (
             invoice={majikInvoice}
             readonly={readonly}
             onRequestPDFExport={() => setIsExportingPDF(true)}
+            onRequestMJKIExport={handleExportMJKI}
             onSign={(props as any).onSign}
             onSeal={(props as any).onSeal}
             onVerify={(props as any).onVerify}

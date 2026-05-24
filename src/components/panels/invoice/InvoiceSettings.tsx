@@ -55,13 +55,6 @@ const SectionLabel = styled.div`
   border-bottom: 1px solid ${({ theme }) => theme.colors.primary}15;
 `;
 
-const FieldRow = styled.div`
-  display: grid;
-  grid-template-columns: 140px 1fr;
-  align-items: center;
-  gap: 12px;
-`;
-
 const FieldColumn = styled.div`
   display: flex;
   flex-direction: column;
@@ -73,57 +66,6 @@ const FieldLabel = styled.label`
   font-size: 11px;
   font-family: ${({ theme }) => theme.typography.fonts.medium};
   color: ${({ theme }) => theme.colors.textSecondary};
-`;
-
-const Input = styled.input`
-  font-family: ${({ theme }) => theme.typography.fonts.regular};
-  font-size: 12px;
-  padding: 6px 10px;
-  border-radius: ${({ theme }) => theme.borders.radius.small};
-  border: 1px solid ${({ theme }) => theme.colors.primary}33;
-  background: ${({ theme }) => theme.colors.secondaryBackground};
-  color: ${({ theme }) => theme.colors.textPrimary};
-  width: 100%;
-
-  &:focus {
-    outline: none;
-    border-color: ${({ theme }) => theme.colors.primary}88;
-  }
-`;
-
-const Select = styled.select`
-  font-family: ${({ theme }) => theme.typography.fonts.regular};
-  font-size: 12px;
-  padding: 6px 10px;
-  border-radius: ${({ theme }) => theme.borders.radius.small};
-  border: 1px solid ${({ theme }) => theme.colors.primary}33;
-  background: ${({ theme }) => theme.colors.secondaryBackground};
-  color: ${({ theme }) => theme.colors.textPrimary};
-  width: 100%;
-  cursor: pointer;
-
-  &:focus {
-    outline: none;
-    border-color: ${({ theme }) => theme.colors.primary}88;
-  }
-`;
-
-const Textarea = styled.textarea`
-  font-family: ${({ theme }) => theme.typography.fonts.regular};
-  font-size: 12px;
-  padding: 8px 10px;
-  border-radius: ${({ theme }) => theme.borders.radius.small};
-  border: 1px solid ${({ theme }) => theme.colors.primary}33;
-  background: ${({ theme }) => theme.colors.secondaryBackground};
-  color: ${({ theme }) => theme.colors.textPrimary};
-  width: 100%;
-  min-height: 64px;
-  resize: vertical;
-
-  &:focus {
-    outline: none;
-    border-color: ${({ theme }) => theme.colors.primary}88;
-  }
 `;
 
 const InvoiceNumberPreview = styled.div`
@@ -327,7 +269,7 @@ const BEHAVIOUR_OPTIONS: { value: string; label: string }[] = [
 
 interface InvoiceSettingsProps {
   majik: MajikBuwizClient;
-  onClose: () => void;
+  onClose?: () => void;
   onChange?: (defaults: InvoiceDefaults) => void;
 }
 
@@ -432,50 +374,59 @@ export const InvoiceSettings: React.FC<InvoiceSettingsProps> = ({
           <SectionLabel>
             <UserIcon size={12} /> Issuer
           </SectionLabel>
-          <FieldRow>
-            <CustomFormInput
-              label="Legal Name"
-              onChange={(e) => setIssuerField("legalName", e as string)}
-              value={form.issuer?.legalName ?? ""}
-              required
-              placeholder="Your company name"
-              maxChar={200}
-              hideCharLimit
-            />
-          </FieldRow>
-          <FieldRow>
-            <FieldLabel>Trade Name</FieldLabel>
-            <Input
-              value={form.issuer?.tradeName ?? ""}
-              onChange={(e) => setIssuerField("tradeName", e.target.value)}
-              placeholder="DBA / brand name"
-            />
-          </FieldRow>
-          <FieldRow>
-            <FieldLabel>Tagline</FieldLabel>
-            <Input
-              value={form.tagline ?? ""}
-              onChange={(e) => setField("tagline", e.target.value)}
-              placeholder="Tagline"
-            />
-          </FieldRow>
-          <FieldRow>
-            <FieldLabel>Email</FieldLabel>
-            <Input
-              type="email"
-              value={form.issuer?.email ?? ""}
-              onChange={(e) => setIssuerField("email", e.target.value)}
-              placeholder="billing@yourcompany.com"
-            />
-          </FieldRow>
-          <FieldRow>
-            <FieldLabel>TIN</FieldLabel>
-            <Input
-              value={form.issuer?.tin ?? ""}
-              onChange={(e) => setIssuerField("tin", e.target.value)}
-              placeholder="123-456-789-000"
-            />
-          </FieldRow>
+
+          <CustomFormInput
+            label="Legal Name"
+            onChange={(e) => setIssuerField("legalName", e as string)}
+            value={form.issuer?.legalName ?? ""}
+            required
+            placeholder="Your company name"
+            maxChar={200}
+            hideCharLimit
+            layout="stack"
+          />
+
+          <CustomFormInput
+            label="Trade Name"
+            onChange={(e) => setIssuerField("tradeName", e as string)}
+            value={form.issuer?.tradeName ?? ""}
+            required
+            placeholder="DBA / brand name"
+            maxChar={200}
+            hideCharLimit
+            layout="stack"
+          />
+
+          <CustomFormInput
+            label="Tagline"
+            onChange={(e) => setField("tagline", e as string)}
+            value={form.tagline ?? ""}
+            placeholder="Tagline"
+            maxChar={200}
+            hideCharLimit
+            layout="row"
+          />
+
+          <CustomFormInput
+            label="Email"
+            onChange={(e) => setIssuerField("email", e as string)}
+            value={form.issuer?.email ?? ""}
+            placeholder="billing@yourcompany.com"
+            maxChar={100}
+            hideCharLimit
+            layout="row"
+            type="email"
+          />
+
+          <CustomFormInput
+            label="TIN"
+            onChange={(e) => setIssuerField("tin", e as string)}
+            value={form.issuer?.tin ?? ""}
+            placeholder="123-456-789-000"
+            maxChar={30}
+            hideCharLimit
+            layout="row"
+          />
         </Section>
 
         {/* ── Billing ── */}
@@ -483,19 +434,17 @@ export const InvoiceSettings: React.FC<InvoiceSettingsProps> = ({
           <SectionLabel>
             <CurrencyDollarIcon size={12} /> Billing
           </SectionLabel>
-          <FieldRow>
-            <FieldLabel>Currency</FieldLabel>
-            <Select
-              value={form.currency}
-              onChange={(e) => setField("currency", e.target.value)}
-            >
-              {COMMON_CURRENCIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </Select>
-          </FieldRow>
+          <CustomFormInput
+            label="Currency"
+            onChange={(e) => setField("currency", e as string)}
+            value={form.currency}
+            layout="row"
+            options={COMMON_CURRENCIES.map((c) => ({
+              value: c,
+              label: c.toUpperCase(),
+            }))}
+          />
+
           <FieldColumn>
             <FieldLabel>Payment Terms</FieldLabel>
             <PaymentTermsPicker
@@ -504,14 +453,16 @@ export const InvoiceSettings: React.FC<InvoiceSettingsProps> = ({
               readonly={false}
             />
           </FieldColumn>
-          <FieldRow>
-            <FieldLabel>Default Notes</FieldLabel>
-            <Textarea
-              value={form.notes ?? ""}
-              onChange={(e) => setField("notes", e.target.value || undefined)}
-              placeholder="Payment instructions, bank details…"
-            />
-          </FieldRow>
+          <CustomFormInput
+            label="Default Notes"
+            onChange={(e) => setField("notes", e as string)}
+            value={form.notes ?? ""}
+            placeholder="Payment instructions, bank details…"
+            maxChar={2500}
+            hideCharLimit
+            layout="stack"
+            type="paragraph"
+          />
         </Section>
 
         {/* ── Tax Manager ── */}
@@ -684,25 +635,28 @@ export const InvoiceSettings: React.FC<InvoiceSettingsProps> = ({
           <SectionLabel>
             <HashIcon size={12} /> Numbering
           </SectionLabel>
-          <FieldRow>
-            <FieldLabel>Prefix</FieldLabel>
-            <Input
-              value={form.invoiceNumberPrefix ?? "INV-"}
-              onChange={(e) => setField("invoiceNumberPrefix", e.target.value)}
-              placeholder="INV-"
-            />
-          </FieldRow>
-          <FieldRow>
-            <FieldLabel>Next Number</FieldLabel>
-            <Input
-              type="number"
-              min={1}
-              value={form.invoiceNumberCounter ?? 1}
-              onChange={(e) =>
-                setField("invoiceNumberCounter", parseInt(e.target.value) || 1)
-              }
-            />
-          </FieldRow>
+          <CustomFormInput
+            label="Prefix"
+            onChange={(e) => setField("invoiceNumberPrefix", e as string)}
+            value={form.invoiceNumberPrefix ?? "INV-"}
+            placeholder="INV-"
+            maxChar={100}
+            hideCharLimit
+            layout="row"
+          />
+
+          <CustomFormInput
+            label="Next Number"
+            onChange={(e) =>
+              setField("invoiceNumberCounter", parseInt(e as string) || 1)
+            }
+            value={String(form.invoiceNumberCounter ?? 1)}
+            maxChar={50}
+            hideCharLimit
+            layout="row"
+            type="number"
+          />
+
           <InvoiceNumberPreview>
             Preview: {invoiceNumberPreview}
           </InvoiceNumberPreview>

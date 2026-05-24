@@ -54,6 +54,8 @@ import { BIRReturnType, getBIRFilingWindow } from "@/SDK/bir-tax-period";
 import { downloadMajikBuwizSummaryPDF } from "./invoice/MajikBuwizSummaryDocument";
 import { CtrlBtn } from "@/globals/buttons";
 import DynamicPlaceholder from "../foundations/DynamicPlaceholder";
+import ChartRevenueTrend from "./dashboard/charts/ChartRevenueTrend";
+import ChartStatusDistribution from "./dashboard/charts/ChartStatusDistribution";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -487,7 +489,7 @@ const StatusCount = styled.span`
 
 // ── Chart placeholder ──────────────────────────────────────────────────────
 const ChartPlaceholder = styled.div<{ $height?: number }>`
-  height: ${({ $height = 160 }) => $height}px;
+  minheight: ${({ $height = 160 }) => $height}px;
   border-radius: ${({ theme }) => theme.borders.radius.medium};
   background: ${({ theme }) => theme.colors.secondaryBackground};
   border: 1px dashed ${({ theme }) => theme.colors.primary}22;
@@ -500,6 +502,7 @@ const ChartPlaceholder = styled.div<{ $height?: number }>`
   opacity: 0.5;
   font-size: 12px;
   font-family: ${({ theme }) => theme.typography.fonts.light};
+  padding: 2em;
 `;
 
 // ── Top recipients ─────────────────────────────────────────────────────────
@@ -1003,7 +1006,7 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
                     </CardIconWrap>
                     <CardLabel>
                       Outstanding
-                      <Tooltip tip="Sum of amountDue across accessible invoices — the balance customers still owe." />
+                      <Tooltip tip="Sum of amount due across accessible invoices — the balance customers still owe." />
                     </CardLabel>
                   </CardHeader>
                   <CopyValue
@@ -1268,12 +1271,13 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
                 ))}
               </StatusRow>
 
-              <ChartPlaceholder $height={140}>
-                <ChartPieSliceIcon size={28} />
-                <span>Status distribution chart coming soon</span>
-                {/* <span style={{ fontSize: 10, opacity: 0.6 }}>
-                  Plug in your preferred charting library
-                </span> */}
+              <ChartPlaceholder $height={400}>
+                <ChartStatusDistribution
+                  currency={currency}
+                  height={250}
+                  byStatus={stats.byStatus}
+                  byStatusAmount={stats.byStatusAmount}
+                />
               </ChartPlaceholder>
 
               {/* Amount by status table */}
@@ -1339,12 +1343,14 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
               </SectionLabel>
 
               <TwoCol>
-                <ChartPlaceholder $height={220}>
-                  <ChartLineUpIcon size={28} />
-                  <span>Revenue trend chart coming soon</span>
-                  <span style={{ fontSize: 10, opacity: 0.6 }}>
-                    Daily / weekly / monthly bucketing
-                  </span>
+                <ChartPlaceholder $height={400}>
+                  <ChartRevenueTrend
+                    invoices={invoices}
+                    range={range}
+                    currency={currency}
+                    height={400}
+                    mode="stacked"
+                  />
                 </ChartPlaceholder>
 
                 <Card>

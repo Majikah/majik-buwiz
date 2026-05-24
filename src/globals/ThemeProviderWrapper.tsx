@@ -31,10 +31,12 @@ export default function ThemeProviderWrapper({
         textSecondary: darkMode ? "#bdb1a3" : "#514f4f",
         semitransparent: darkMode ? "#1a191882" : theme.colors.semitransparent,
 
+        accent: !!darkMode ? "#186dec" : "#002968",
+
         brand: {
           green: "#9b9e00ff",
           red: "#ff471e",
-          blue: "#002968",
+          blue: !!darkMode ? "#186dec" : "#002968",
           white: "#f7f7f7",
         },
         disabled: "#1e2021",

@@ -1,15 +1,20 @@
 /**
- * InvoiceTable.tsx
+ * ContactsTable.tsx
  *
- * Changes from previous version:
- *  - onDuplicate prop added — shown only for sealed invoices; edit is hidden
- *    for sealed invoices (the action column is now state-aware)
- *  - Sealed badge bug fix: reads inv.isSealed directly (correct) but also
- *    guards fmtAmount with try/catch to prevent throws on encrypted+locked rows
- *  - Action column order: View | Edit (if !sealed) | Duplicate (if sealed) | Delete
+ * Table view for contacts with:
+ *  - Sortable columns (name, legal name, TIN, email, phone, registration status)
+ *  - Pagination
+ *  - Row-level: view/edit, delete
+ *  - Bulk operations: delete, export-as-backup (placeholder handler)
  */
 
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import styled, { css } from "styled-components";
 import {
   CaretDownIcon,
@@ -17,283 +22,178 @@ import {
   CaretRightIcon,
   CaretUpDownIcon,
   CaretUpIcon,
-  CopySimpleIcon,
   DownloadSimpleIcon,
-  EyeIcon,
-  LockKeyIcon,
   PencilSimpleIcon,
-  SealIcon,
   TrashIcon,
+  WifiHighIcon,
 } from "@phosphor-icons/react";
-import type { MajikInvoice } from "@majikah/majik-invoice";
+import type { MajikInvoiceContact } from "@/SDK/majik-buwiz-client/src/core/party/majik-invoice-contact";
 
 // ---------------------------------------------------------------------------
-// Column definition
+// Types
 // ---------------------------------------------------------------------------
 
-export type SortType = "alpha" | "numeric" | "date";
+export type ContactSortType = "alpha" | "boolean";
 
-export interface InvoiceColumnDef {
+export interface ContactColumnDef {
   key: string;
   header: string;
-  render: (invoice: MajikInvoice) => React.ReactNode;
-  sortValue?: (invoice: MajikInvoice) => string | number | null | undefined;
-  sortable?: SortType | false;
+  render: (contact: MajikInvoiceContact) => React.ReactNode;
+  sortValue?: (
+    contact: MajikInvoiceContact,
+  ) => string | number | null | undefined;
+  sortable?: ContactSortType | false;
   minWidth?: string;
   align?: "left" | "center" | "right";
 }
-
-// ---------------------------------------------------------------------------
-// Internal sort state
-// ---------------------------------------------------------------------------
 
 type SortDir = "asc" | "desc";
 
 interface SortState {
   key: string;
   dir: SortDir;
-  type: SortType;
+  type: ContactSortType;
 }
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
-export interface InvoiceTableProps {
-  items: MajikInvoice[];
-  columns?: InvoiceColumnDef[];
+export interface ContactsTableProps {
+  contacts: MajikInvoiceContact[];
   pageSize?: number;
   paginationAt?: "top" | "bottom" | "both";
-  onView?: (invoice: MajikInvoice) => void;
-  onEdit?: (invoice: MajikInvoice) => void;
-  onDelete?: (invoice: MajikInvoice) => void;
-  onBulkDelete?: (invoices: MajikInvoice[]) => void;
-  /** Called when user clicks Duplicate on a sealed invoice */
-  onDuplicate?: (invoice: MajikInvoice) => void;
-  /** When provided, only columns whose key is in this set are rendered. */
-  visibleColumnKeys?: Set<string>;
-  onBulkExport?: (
-    mode: "csv" | "pdf" | "mjki",
-    invoices: MajikInvoice[],
-  ) => void;
-  onSelectionChange?: (invoices: MajikInvoice[]) => void;
+  onEdit?: (contact: MajikInvoiceContact) => void;
+  onDelete?: (contact: MajikInvoiceContact) => void;
+  onBulkDelete?: (contacts: MajikInvoiceContact[]) => void;
+  /** Placeholder — bulk backup export. Implement in ContactsPanel. */
+  onBulkExportBackup?: (contacts: MajikInvoiceContact[]) => void;
+  onSelectionChange?: (contacts: MajikInvoiceContact[]) => void;
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const statusColor = (status: string): string => {
-  switch (status?.toLowerCase()) {
-    case "issued":
-      return "var(--inv-paid,      #2b7fd4)";
+function shortenKey(key: string, chars = 6): string {
+  const s = String(key);
+  return `${s.slice(0, chars)}…${s.slice(-4)}`;
+}
 
-    case "draft":
-      return "var(--inv-draft,     #8b8fa8)";
-    case "paid":
-      return "var(--inv-issued,    #3b9e6a)";
-    case "overdue":
-      return "var(--inv-overdue,   #c74e4e)";
-    case "cancelled":
-      return "var(--inv-cancelled, #c74e4e)";
-    default:
-      return "var(--inv-default,   #8b8fa8)";
-  }
-};
+function getHue(str: string): number {
+  return [...str].reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
+}
 
-const modeLabel = (mode: string) =>
-  mode === "encrypted-and-signed"
-    ? "Encrypted"
-    : mode === "signed-only"
-      ? "Signed"
-      : (mode ?? "—");
-
-const fmtDate = (iso?: string | null): string => {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return iso;
-  }
-};
-
-const fmtAmount = (inv: MajikInvoice): string => {
-  try {
-    // Guard against encrypted+locked invoices — inv.invoice throws
-    if (inv.isEncrypted && !inv.hasDecryptedCache) return "—";
-    const total = inv.invoice?.totals?.grandTotal;
-    if (!total) return "—";
-    const major =
-      typeof total.toMajor === "function" ? total.toMajor() : Number(total);
-    const currency = inv.invoice?.currency || "PHP";
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency,
-      minimumFractionDigits: 2,
-    }).format(Number(major));
-  } catch {
-    return "—";
-  }
-};
-
-/** Safe accessor: returns null when payload is encrypted and locked */
-const safeInvoice = (inv: MajikInvoice) =>
-  !inv.isEncrypted || inv.hasDecryptedCache ? inv.invoice : null;
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
 
 // ---------------------------------------------------------------------------
 // Default column definitions
 // ---------------------------------------------------------------------------
 
-const DEFAULT_COLUMNS: InvoiceColumnDef[] = [
+const DEFAULT_COLUMNS: ContactColumnDef[] = [
   {
-    key: "invoiceNumber",
-    header: "Invoice #",
+    key: "name",
+    header: "Name",
+    minWidth: "180px",
+    sortable: "alpha",
+    sortValue: (c) => c.meta?.label ?? "",
+    render: (c) => {
+      const name = c.meta?.label || "Unknown";
+      const hue = getHue(name);
+      const initials = getInitials(name);
+      return (
+        <NameCell>
+          <ContactAvatar $hue={hue} data-private>
+            {initials}
+          </ContactAvatar>
+          <NameText data-private>{name}</NameText>
+        </NameCell>
+      );
+    },
+  },
+  {
+    key: "legalName",
+    header: "Legal Name",
+    minWidth: "160px",
+    sortable: "alpha",
+    sortValue: (c) => (c.meta as any)?.legalName ?? "",
+    render: (c) => {
+      const v = (c.meta as any)?.legalName;
+      return <CellText data-private>{v ?? <Muted>—</Muted>}</CellText>;
+    },
+  },
+  {
+    key: "tin",
+    header: "TIN",
     minWidth: "130px",
     sortable: "alpha",
-    sortValue: (inv) =>
-      inv.public?.invoiceNumber ?? safeInvoice(inv)?.invoiceNumber ?? inv.id,
-    render: (inv) => (
-      <InvoiceNumber data-private>
-        {inv.public?.invoiceNumber ??
-          safeInvoice(inv)?.invoiceNumber ??
-          inv.id.slice(0, 10)}
-      </InvoiceNumber>
+    sortValue: (c) => (c.meta as any)?.tin ?? "",
+    render: (c) => {
+      const v = (c.meta as any)?.tin;
+      return <MonoCell data-private>{v ?? <Muted>—</Muted>}</MonoCell>;
+    },
+  },
+  {
+    key: "email",
+    header: "Email",
+    minWidth: "190px",
+    sortable: "alpha",
+    sortValue: (c) => (c.meta as any)?.email ?? "",
+    render: (c) => {
+      const v = (c.meta as any)?.email;
+      return <CellText data-private>{v ?? <Muted>—</Muted>}</CellText>;
+    },
+  },
+  {
+    key: "phone",
+    header: "Phone",
+    minWidth: "140px",
+    sortable: "alpha",
+    sortValue: (c) => (c.meta as any)?.phone ?? "",
+    render: (c) => {
+      const v = (c.meta as any)?.phone;
+      return <MonoCell data-private>{v ?? <Muted>—</Muted>}</MonoCell>;
+    },
+  },
+  {
+    key: "fingerprint",
+    header: "Fingerprint",
+    minWidth: "140px",
+    sortable: "alpha",
+    sortValue: (c) => c.id,
+    render: (c) => (
+      <FingerprintCell data-private>{shortenKey(c.id)}</FingerprintCell>
     ),
   },
   {
-    key: "issuer",
-    header: "Issuer",
-    minWidth: "150px",
-    sortable: "alpha",
-    sortValue: (inv) =>
-      inv.public?.issuerName ?? safeInvoice(inv)?.issuer?.legalName ?? "",
-    render: (inv) => {
-      const name =
-        inv.public?.issuerName ?? safeInvoice(inv)?.issuer?.legalName;
-      return <CellText data-private>{name ?? <Muted>—</Muted>}</CellText>;
-    },
-  },
-  {
-    key: "recipient",
-    header: "Recipient",
-    minWidth: "150px",
-    sortable: "alpha",
-    sortValue: (inv) =>
-      safeInvoice(inv)?.recipient?.legalName ?? inv.public.recipientName,
-    render: (inv) => {
-      const name =
-        safeInvoice(inv)?.recipient?.legalName ?? inv.public.recipientName;
-      return (
-        <CellText data-private>
-          {name ?? <Redacted>Encrypted</Redacted>}
-        </CellText>
-      );
-    },
-  },
-  {
-    key: "status",
-    header: "Status",
+    key: "registered",
+    header: "Registered",
     minWidth: "110px",
     align: "center",
-    sortable: "alpha",
-    sortValue: (inv) =>
-      `${inv.displayStatus} ${inv.isLocked ? "" : `- ${inv.status}`}`,
-    render: (inv) => {
-      return (
-        <StatusBadge $color={statusColor(inv.status)} data-private>
-          {inv.status}
-        </StatusBadge>
+    sortable: "boolean",
+    sortValue: (c) => (c.isMajikahRegistered?.() ? 1 : 0),
+    render: (c) => {
+      const registered = c.isMajikahRegistered?.() ?? false;
+      return registered ? (
+        <RegisteredBadge>
+          <WifiHighIcon size={9} weight="bold" /> Online
+        </RegisteredBadge>
+      ) : (
+        <LocalBadge>Local</LocalBadge>
       );
     },
-  },
-  {
-    key: "mode",
-    header: "Mode",
-    minWidth: "120px",
-    align: "center",
-    sortable: "alpha",
-    sortValue: (inv) => inv.mode ?? "",
-    render: (inv) => (
-      <ModeBadge $encrypted={inv.isEncrypted}>{modeLabel(inv.mode)}</ModeBadge>
-    ),
-  },
-  {
-    key: "amount",
-    header: "Amount",
-    minWidth: "140px",
-    align: "right",
-    sortable: "numeric",
-    sortValue: (inv) => {
-      try {
-        if (inv.isEncrypted && !inv.hasDecryptedCache) return null;
-        const total = inv.invoice?.totals?.grandTotal;
-        if (!total) return null;
-        return typeof total.toMajor === "function"
-          ? Number(total.toMajor())
-          : Number(total);
-      } catch {
-        return null;
-      }
-    },
-    render: (inv) => <AmountCell data-private>{fmtAmount(inv)}</AmountCell>,
-  },
-  {
-    key: "issueDate",
-    header: "Issue Date",
-    minWidth: "120px",
-    sortable: "date",
-    sortValue: (inv) => {
-      const d = safeInvoice(inv)?.issueDate;
-      return d ? new Date(d).getTime() : null;
-    },
-    render: (inv) => (
-      <DateCell data-private>{fmtDate(safeInvoice(inv)?.issueDate)}</DateCell>
-    ),
-  },
-  {
-    key: "dueDate",
-    header: "Due Date",
-    minWidth: "120px",
-    sortable: "date",
-    sortValue: (inv) => {
-      const d = safeInvoice(inv)?.dueDate;
-      return d ? new Date(d).getTime() : null;
-    },
-    render: (inv) => (
-      <DateCell data-private>{fmtDate(safeInvoice(inv)?.dueDate)}</DateCell>
-    ),
-  },
-  {
-    key: "sealed",
-    header: "Seal",
-    minWidth: "90px",
-    align: "center",
-    sortable: "alpha",
-    sortValue: (inv) => (inv.isSealed ? "sealed" : "unsealed"),
-    render: (inv) =>
-      inv.isSealed ? (
-        <SealedBadge>
-          <LockKeyIcon size={10} weight="fill" /> Sealed
-        </SealedBadge>
-      ) : (
-        <UnsealedDot title="Unsealed" />
-      ),
   },
 ];
 
 // ---------------------------------------------------------------------------
-// Sort utility
+// Sort
 // ---------------------------------------------------------------------------
 
-function sortItems(
-  items: MajikInvoice[],
+function sortContacts(
+  items: MajikInvoiceContact[],
   state: SortState | null,
-  columns: InvoiceColumnDef[],
-): MajikInvoice[] {
+  columns: ContactColumnDef[],
+): MajikInvoiceContact[] {
   if (!state) return items;
   const col = columns.find((c) => c.key === state.key);
   if (!col?.sortValue) return items;
@@ -305,7 +205,7 @@ function sortItems(
     if (av == null) return 1;
     if (bv == null) return -1;
     const cmp =
-      state.type === "numeric" || state.type === "date"
+      state.type === "boolean"
         ? (av as number) - (bv as number)
         : String(av).localeCompare(String(bv), undefined, {
             sensitivity: "base",
@@ -343,12 +243,10 @@ const TableScroll = styled.div`
   &::-webkit-scrollbar {
     height: 5px;
   }
-
   &::-webkit-scrollbar-track {
     background: ${({ theme }) => theme.colors.secondaryBackground};
     border-radius: 8px;
   }
-
   &::-webkit-scrollbar-thumb {
     background: ${({ theme }) => theme.gradients.primary};
     border-radius: 8px;
@@ -422,7 +320,7 @@ const Tr = styled.tr<{ $selected?: boolean }>`
   transition: background 0.1s;
   border-bottom: 1px solid ${({ theme }) => theme.colors.primary}0c;
   background: ${({ $selected, theme }) =>
-    $selected ? `${theme.colors.primarySoft}` : "transparent"};
+    $selected ? theme.colors.primarySoft : "transparent"};
 
   &:last-child {
     border-bottom: none;
@@ -433,7 +331,7 @@ const Tr = styled.tr<{ $selected?: boolean }>`
 `;
 
 const Td = styled.td<{ $align?: "left" | "center" | "right" }>`
-  padding: 11px 14px;
+  padding: 10px 14px;
   text-align: ${({ $align }) => $align ?? "left"};
   vertical-align: middle;
 `;
@@ -449,7 +347,7 @@ const CheckboxTh = styled.th`
 const CheckboxTd = styled.td`
   width: 40px;
   min-width: 40px;
-  padding: 11px 8px 11px 14px;
+  padding: 10px 8px 10px 14px;
   vertical-align: middle;
 `;
 
@@ -459,6 +357,8 @@ const Checkbox = styled.input.attrs({ type: "checkbox" })`
   cursor: pointer;
   accent-color: ${({ theme }) => theme.colors.primary};
 `;
+
+// ── Bulk bar ─────────────────────────────────────────────────────────────────
 
 const BulkBar = styled.div<{ $visible: boolean }>`
   display: flex;
@@ -486,7 +386,7 @@ const BulkCount = styled.span`
   flex: 1;
 `;
 
-const BulkDeleteBtn = styled.button`
+const BulkBtn = styled.button<{ $variant?: "danger" | "default" }>`
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -494,14 +394,27 @@ const BulkDeleteBtn = styled.button`
   font-size: 11px;
   padding: 6px 12px;
   border-radius: ${({ theme }) => theme.borders.radius.medium};
-  border: 1px solid ${({ theme }) => theme.colors.error}44;
-  background: ${({ theme }) => theme.colors.error}12;
-  color: ${({ theme }) => theme.colors.error};
   cursor: pointer;
   transition: all 0.15s;
-  &:hover {
-    background: ${({ theme }) => theme.colors.error}22;
-  }
+
+  ${({ $variant, theme }) =>
+    $variant === "danger"
+      ? css`
+          border: 1px solid ${theme.colors.error}44;
+          background: ${theme.colors.error}12;
+          color: ${theme.colors.error};
+          &:hover {
+            background: ${theme.colors.error}22;
+          }
+        `
+      : css`
+          border: 1px solid ${theme.colors.primary}44;
+          background: ${theme.colors.primarySoft};
+          color: ${theme.colors.primary};
+          &:hover {
+            background: ${theme.colors.primary}22;
+          }
+        `}
 `;
 
 const ClearSelBtn = styled.button`
@@ -520,97 +433,73 @@ const ClearSelBtn = styled.button`
   }
 `;
 
-const BulkExportBtn = styled.button`
-  display: inline-flex;
+// ── Cell atoms ────────────────────────────────────────────────────────────────
+
+const NameCell = styled.div`
+  display: flex;
   align-items: center;
-  gap: 6px;
-  font-family: ${({ theme }) => theme.typography.fonts.medium};
-  font-size: 11px;
-  padding: 6px 12px;
-  border-radius: ${({ theme }) => theme.borders.radius.medium};
-  border: 1px solid ${({ theme }) => theme.colors.primary}44;
-  background: ${({ theme }) => theme.colors.primarySoft};
-  color: ${({ theme }) => theme.colors.primary};
-  cursor: pointer;
-  transition: all 0.15s;
-  &:hover {
-    background: ${({ theme }) => theme.colors.primary}22;
-  }
+  gap: 10px;
 `;
 
-// Cell atoms
+const ContactAvatar = styled.div<{ $hue: number }>`
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: hsl(${({ $hue }) => $hue}, 38%, 24%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: ${({ theme }) => theme.typography.fonts.mono};
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.78);
+  flex-shrink: 0;
+  user-select: none;
+`;
 
-const InvoiceNumber = styled.span`
-  font-family: ${({ theme }) => theme.typography.fonts.numbers};
-  font-size: 12px;
-  color: ${({ theme }) => theme.colors.primary};
+const NameText = styled.span`
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
 `;
 
 const CellText = styled.span`
   font-family: ${({ theme }) => theme.typography.fonts.medium};
   font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  display: block;
+`;
+
+const MonoCell = styled.span`
+  font-family: ${({ theme }) =>
+    theme.typography.fonts.mono ?? "'Fira Mono', monospace"};
+  font-size: 11px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  letter-spacing: 0.02em;
+`;
+
+const FingerprintCell = styled.span`
+  font-family: ${({ theme }) =>
+    theme.typography.fonts.mono ?? "'Fira Mono', monospace"};
+  font-size: 10px;
+  color: ${({ theme }) => theme.colors.primary};
+  letter-spacing: 0.04em;
+  opacity: 0.7;
 `;
 
 const Muted = styled.span`
   opacity: 0.35;
 `;
 
-const Redacted = styled.span`
-  font-size: 11px;
-  opacity: 0.4;
-  font-style: italic;
-`;
-
-const StatusBadge = styled.span<{ $color: string }>`
-  display: inline-block;
-  font-family: ${({ theme }) => theme.typography.fonts.medium};
-  font-size: 10px;
-  padding: 2px 9px;
-  border-radius: ${({ theme }) => theme.borders.radius.rounded};
-  text-transform: capitalize;
-  color: ${({ $color }) => $color};
-  background: ${({ $color }) => $color}18;
-  border: 1px solid ${({ $color }) => $color};
-`;
-
-const ModeBadge = styled.span<{ $encrypted: boolean }>`
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-family: ${({ theme }) => theme.typography.fonts.medium};
-  font-size: 10px;
-  padding: 2px 9px;
-  border-radius: ${({ theme }) => theme.borders.radius.rounded};
-  ${({ $encrypted, theme }) =>
-    $encrypted
-      ? css`
-          color: ${theme.colors.primary};
-          background: ${theme.colors.primarySoft};
-          border: 1px solid ${theme.colors.primary}33;
-        `
-      : css`
-          color: ${theme.colors.textSecondary};
-          background: transparent;
-          border: 1px solid ${theme.colors.primary}18;
-        `}
-`;
-
-const AmountCell = styled.span`
-  font-family: ${({ theme }) => theme.typography.fonts.numbers};
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-`;
-
-const DateCell = styled.span`
-  font-family: ${({ theme }) => theme.typography.fonts.light};
-  font-size: 12px;
-  color: ${({ theme }) => theme.colors.textSecondary};
-`;
-
-const SealedBadge = styled.span`
+const RegisteredBadge = styled.span`
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -618,20 +507,24 @@ const SealedBadge = styled.span`
   font-size: 10px;
   padding: 2px 8px;
   border-radius: ${({ theme }) => theme.borders.radius.rounded};
-  color: ${({ theme }) => theme.colors.primary};
-  background: ${({ theme }) => theme.colors.primary}18;
-  border: 1px solid ${({ theme }) => theme.colors.primary}33;
+  color: ${({ theme }) => theme.colors.brand?.green ?? "#10b981"};
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
 `;
 
-const UnsealedDot = styled.span`
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: ${({ theme }) => theme.colors.primary}28;
+const LocalBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  font-family: ${({ theme }) => theme.typography.fonts.medium};
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: ${({ theme }) => theme.borders.radius.rounded};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid ${({ theme }) => theme.colors.secondaryBackground};
 `;
 
-// Actions
+// ── Actions ───────────────────────────────────────────────────────────────────
 
 const ActionsCell = styled.div`
   display: flex;
@@ -640,9 +533,7 @@ const ActionsCell = styled.div`
   justify-content: flex-end;
 `;
 
-const ActionBtn = styled.button<{
-  $variant?: "danger" | "muted" | "default" | "ghost";
-}>`
+const ActionBtn = styled.button<{ $variant?: "danger" | "ghost" | "default" }>`
   background: none;
   border: none;
   cursor: pointer;
@@ -664,13 +555,6 @@ const ActionBtn = styled.button<{
             background: ${theme.colors.error}15;
             opacity: 1;
           }
-        `;
-      case "muted":
-        return css`
-          color: ${theme.colors.textSecondary};
-          opacity: 0.2;
-          cursor: not-allowed;
-          pointer-events: none;
         `;
       case "ghost":
         return css`
@@ -699,7 +583,7 @@ const ActionBtn = styled.button<{
   }
 `;
 
-// Pagination
+// ── Pagination ─────────────────────────────────────────────────────────────────
 
 const PaginationBar = styled.div<{ $position: "top" | "bottom" }>`
   display: flex;
@@ -762,10 +646,6 @@ const EmptyState = styled.div`
   font-size: 13px;
   color: ${({ theme }) => theme.colors.textSecondary};
   opacity: 0.55;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
 `;
 
 // ---------------------------------------------------------------------------
@@ -794,9 +674,9 @@ const Pagination: React.FC<PaginationProps> = ({
   const pages = buildPageNumbers(page, totalPages);
 
   return (
-    <PaginationBar $position={position} id="pagination-invoices">
+    <PaginationBar $position={position}>
       <PageInfo>
-        {totalItems === 0 ? "No invoices" : `${start}–${end} of ${totalItems}`}
+        {totalItems === 0 ? "No contacts" : `${start}–${end} of ${totalItems}`}
       </PageInfo>
       <PageControls>
         <PageBtn onClick={() => onPageChange(page - 1)} disabled={page === 1}>
@@ -829,74 +709,61 @@ const Pagination: React.FC<PaginationProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-// InvoiceTable
+// ContactsTable
 // ---------------------------------------------------------------------------
 
-export const InvoiceTable: React.FC<InvoiceTableProps> = ({
-  items,
-  columns: extraColumns,
+export const ContactsTable: React.FC<ContactsTableProps> = ({
+  contacts,
   pageSize = 50,
   paginationAt = "both",
-  onView,
   onEdit,
   onDelete,
   onBulkDelete,
-  onBulkExport,
-  onDuplicate,
-  visibleColumnKeys,
+  onBulkExportBackup,
   onSelectionChange,
 }) => {
   const [page, setPage] = useState(1);
   const [sortState, setSortState] = useState<SortState | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const columns = useMemo<InvoiceColumnDef[]>(
-    () =>
-      extraColumns ? [...DEFAULT_COLUMNS, ...extraColumns] : DEFAULT_COLUMNS,
-    [extraColumns],
+  const columns = DEFAULT_COLUMNS;
+
+  const sortedContacts = useMemo(
+    () => sortContacts(contacts, sortState, columns),
+    [contacts, sortState],
   );
 
-  /** Columns filtered by visibility — falls back to all columns if no set given */
-  const activeColumns = useMemo<InvoiceColumnDef[]>(
-    () =>
-      visibleColumnKeys && visibleColumnKeys.size > 0
-        ? columns.filter((c) => visibleColumnKeys.has(c.key))
-        : columns,
-    [columns, visibleColumnKeys],
-  );
-
-  const sortedItems = useMemo(
-    () => sortItems(items, sortState, activeColumns),
-    [items, sortState, activeColumns],
-  );
-
-  const totalPages = Math.max(1, Math.ceil(sortedItems.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(sortedContacts.length / pageSize));
   const safePage = Math.min(page, totalPages);
 
   const pageItems = useMemo(() => {
     const start = (safePage - 1) * pageSize;
-    return sortedItems.slice(start, start + pageSize);
-  }, [sortedItems, safePage, pageSize]);
+    return sortedContacts.slice(start, start + pageSize);
+  }, [sortedContacts, safePage, pageSize]);
 
-  const handleSort = useCallback((col: InvoiceColumnDef) => {
+  const handleSort = useCallback((col: ContactColumnDef) => {
     if (!col.sortable) return;
     setSortState((prev) => {
       if (prev?.key === col.key) {
         if (prev.dir === "asc") return { ...prev, dir: "desc" };
         return null;
       }
-      return { key: col.key, dir: "asc", type: col.sortable as SortType };
+      return {
+        key: col.key,
+        dir: "asc",
+        type: col.sortable as ContactSortType,
+      };
     });
     setPage(1);
   }, []);
 
-  const pageIds = useMemo(() => pageItems.map((inv) => inv.id), [pageItems]);
+  const pageIds = useMemo(() => pageItems.map((c) => c.id), [pageItems]);
   const allPageSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
   const somePageSelected = pageIds.some((id) => selectedIds.has(id));
 
   const selectAllRef = useRef<HTMLInputElement>(null);
-  React.useEffect(() => {
+  useEffect(() => {
     if (selectAllRef.current) {
       selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
     }
@@ -910,31 +777,38 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
       } else {
         pageIds.forEach((id) => next.add(id));
       }
-      onSelectionChange?.(items.filter((inv) => next.has(inv.id)));
+      onSelectionChange?.(contacts.filter((c) => next.has(c.id)));
       return next;
     });
-  }, [allPageSelected, pageIds, items, onSelectionChange]);
+  }, [allPageSelected, pageIds, contacts, onSelectionChange]);
 
   const toggleRow = useCallback(
     (id: string) => {
       setSelectedIds((prev) => {
         const next = new Set(prev);
         next.has(id) ? next.delete(id) : next.add(id);
-        onSelectionChange?.(items.filter((inv) => next.has(inv.id)));
+        onSelectionChange?.(contacts.filter((c) => next.has(c.id)));
         return next;
       });
     },
-    [items, onSelectionChange],
+    [contacts, onSelectionChange],
   );
 
-  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    onSelectionChange?.([]);
+  }, [onSelectionChange]);
 
   const handleBulkDelete = useCallback(() => {
-    const selected = items.filter((inv) => selectedIds.has(inv.id));
+    const selected = contacts.filter((c) => selectedIds.has(c.id));
     onBulkDelete?.(selected);
     clearSelection();
-    onSelectionChange?.([]); // ← selection is now empty
-  }, [items, selectedIds, onBulkDelete, clearSelection, onSelectionChange]);
+  }, [contacts, selectedIds, onBulkDelete, clearSelection]);
+
+  const handleBulkExport = useCallback(() => {
+    const selected = contacts.filter((c) => selectedIds.has(c.id));
+    onBulkExportBackup?.(selected);
+  }, [contacts, selectedIds, onBulkExportBackup]);
 
   const showTop = paginationAt === "top" || paginationAt === "both";
   const showBottom = paginationAt === "bottom" || paginationAt === "both";
@@ -943,58 +817,42 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
   const paginationProps: Omit<PaginationProps, "position"> = {
     page: safePage,
     totalPages,
-    totalItems: sortedItems.length,
+    totalItems: sortedContacts.length,
     pageSize,
     onPageChange: setPage,
   };
 
   return (
-    <Root id="table-invoices">
+    <Root>
       {showTop && <Pagination {...paginationProps} position="top" />}
 
+      {/* Bulk action bar */}
       <BulkBar $visible={selectedCount > 0}>
         <BulkCount>
-          {selectedCount} invoice{selectedCount !== 1 ? "s" : ""} selected
+          {selectedCount} contact{selectedCount !== 1 ? "s" : ""} selected
         </BulkCount>
         <ClearSelBtn onClick={clearSelection}>Clear</ClearSelBtn>
 
-        {onBulkExport && (
-          <BulkExportBtn
-            onClick={() => {
-              const selected = items.filter((inv) => selectedIds.has(inv.id));
-              onBulkExport("pdf", selected);
-            }}
-          >
+        {onBulkExportBackup && (
+          <BulkBtn onClick={handleBulkExport}>
             <DownloadSimpleIcon size={12} weight="bold" />
-            Download selected as PDF
-          </BulkExportBtn>
-        )}
-
-        {onBulkExport && (
-          <BulkExportBtn
-            onClick={() => {
-              const selected = items.filter((inv) => selectedIds.has(inv.id));
-              onBulkExport("csv", selected);
-            }}
-          >
-            <DownloadSimpleIcon size={12} weight="bold" />
-            Export selected to CSV
-          </BulkExportBtn>
+            Export as backup
+          </BulkBtn>
         )}
 
         {onBulkDelete && (
-          <BulkDeleteBtn onClick={handleBulkDelete}>
+          <BulkBtn $variant="danger" onClick={handleBulkDelete}>
             <TrashIcon size={12} weight="bold" />
             Delete selected
-          </BulkDeleteBtn>
+          </BulkBtn>
         )}
       </BulkBar>
 
       <TableScroll>
         <Table>
-          <THead id="table-invoices-header">
+          <THead>
             <tr>
-              <CheckboxTh id="table-invoices-col-checkbox">
+              <CheckboxTh>
                 <Checkbox
                   ref={selectAllRef}
                   checked={allPageSelected}
@@ -1002,7 +860,7 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
                 />
               </CheckboxTh>
 
-              {activeColumns.map((col) => (
+              {columns.map((col) => (
                 <Th
                   key={col.key}
                   $align={col.align}
@@ -1029,11 +887,7 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
                 </Th>
               ))}
 
-              <Th
-                $align="right"
-                $minWidth="120px"
-                id="table-invoices-col-actions"
-              >
+              <Th $align="right" $minWidth="90px">
                 Actions
               </Th>
             </tr>
@@ -1042,71 +896,42 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
           <TBody>
             {pageItems.length === 0 ? (
               <tr>
-                <td colSpan={activeColumns.length + 2}>
-                  <EmptyState>
-                    <SealIcon size={32} />
-                    No invoices found.
-                  </EmptyState>
+                <td colSpan={columns.length + 2}>
+                  <EmptyState>No contacts found.</EmptyState>
                 </td>
               </tr>
             ) : (
-              pageItems.map((inv) => (
-                <Tr key={inv.id} $selected={selectedIds.has(inv.id)}>
+              pageItems.map((c) => (
+                <Tr key={c.id} $selected={selectedIds.has(c.id)}>
                   <CheckboxTd>
                     <Checkbox
-                      checked={selectedIds.has(inv.id)}
-                      onChange={() => toggleRow(inv.id)}
+                      checked={selectedIds.has(c.id)}
+                      onChange={() => toggleRow(c.id)}
                     />
                   </CheckboxTd>
 
-                  {activeColumns.map((col) => (
+                  {columns.map((col) => (
                     <Td key={col.key} $align={col.align}>
-                      {col.render(inv)}
+                      {col.render(c)}
                     </Td>
                   ))}
 
                   <Td $align="right">
                     <ActionsCell>
-                      {/* View — always available */}
-                      <ActionBtn
-                        title="View"
-                        onClick={() => onView?.(inv)}
-                        disabled={!onView}
-                      >
-                        <EyeIcon size={14} />
-                      </ActionBtn>
-
-                      {/* Edit — only for unsealed invoices */}
-                      {!inv.isSealed && (
-                        <ActionBtn
-                          title="Edit"
-                          onClick={() => onEdit?.(inv)}
-                          disabled={!onEdit}
-                        >
+                      {onEdit && (
+                        <ActionBtn title="Edit" onClick={() => onEdit(c)}>
                           <PencilSimpleIcon size={14} />
                         </ActionBtn>
                       )}
-
-                      {/* Duplicate  */}
-
-                      <ActionBtn
-                        $variant="ghost"
-                        title="Duplicate as new draft"
-                        onClick={() => onDuplicate?.(inv)}
-                        disabled={!onDuplicate}
-                      >
-                        <CopySimpleIcon size={14} />
-                      </ActionBtn>
-
-                      {/* Delete — always available */}
-                      <ActionBtn
-                        $variant="danger"
-                        title="Delete"
-                        onClick={() => onDelete?.(inv)}
-                        disabled={!onDelete}
-                      >
-                        <TrashIcon size={14} />
-                      </ActionBtn>
+                      {onDelete && (
+                        <ActionBtn
+                          $variant="danger"
+                          title="Delete"
+                          onClick={() => onDelete(c)}
+                        >
+                          <TrashIcon size={14} />
+                        </ActionBtn>
+                      )}
                     </ActionsCell>
                   </Td>
                 </Tr>

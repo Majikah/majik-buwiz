@@ -598,7 +598,7 @@ const CBaseUserAccount: React.FC<CBaseUserAccountProps> = ({
                 }}
               >
                 <CustomInputField
-                  label="Enter Old Password"
+                  label="Enter Old Passphrase"
                   onChange={(value) =>
                     setPassphraseUpdate((prev) => ({
                       ...prev,
@@ -611,7 +611,7 @@ const CBaseUserAccount: React.FC<CBaseUserAccountProps> = ({
                 />
                 {passphraseUpdate.passphrase.old?.trim() && (
                   <CustomInputField
-                    label="Enter New Password"
+                    label="Enter New Passphrase"
                     onChange={(value) =>
                       setPassphraseUpdate((prev) => ({
                         ...prev,

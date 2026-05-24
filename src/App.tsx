@@ -53,21 +53,41 @@ import {
 } from "./components/majikah-session-wrapper/api-types";
 import { MajikInvoiceContact } from "./SDK/majik-buwiz-client/src/core/party/majik-invoice-contact";
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import { readFile, writeFile } from "@tauri-apps/plugin-fs";
+
+import { MajikInvoice } from "@majikah/majik-invoice";
+import { ImportMJKIModal } from "./components/panels/invoice/modals/ImportMJKIModal";
+import { InvoiceSettingsModal } from "./components/panels/invoice/modals/InvoiceSettingsModal";
+import CSVExportDialog from "./components/panels/invoice/CSVExportDialog";
+import { sendNotification } from "@tauri-apps/plugin-notification";
+import { ImportInvoiceBackupModal } from "./components/panels/invoice/modals/ImportInvoiceModal";
+import { ImportContactBackupModal } from "./components/panels/contacts/modals/ImportContactBackupModal";
+import { ContactManagerSnapshot } from "./SDK/majik-buwiz-client/src";
+import { AppDataSnapshot } from "./SDK/majik-buwiz-client/src/core/backup/types";
+import { ImportAppDataModal } from "./components/panels/modals/ImportAppDataModal";
+import { AppSettingsModal } from "./components/panels/settings/AppSettingsModal";
+import { ExportAccountKeyModal } from "./components/panels/muid/modals/ExportAccountKeyModal";
 
 type ModalKeyContext =
   | "create-account"
   | "replace-account"
   | "import-account"
   | "import-contact"
+  | "import-contact-backup"
   | "import-invoice-mjki"
   | "import-invoice-csv"
+  | "import-invoice-backup"
   | "export-invoice-backup"
   | "export-invoice-csv"
   | "export-contacts"
   | "export-backup"
+  | "restore-backup"
   | "export-majik-key"
   | "validate-invoice"
   | "auth-majikah"
+  | "invoice-settings"
+  | "user-preferences"
   | null;
 
 const RootContainer = styled.div`
@@ -105,8 +125,21 @@ function App(): JSX.Element {
 
   const [modalKey, setModalKey] = useState<ModalKeyContext>(null);
 
-  // const [pendingSignFile, setPendingSignFile] = useState<File | null>(null);
-  // const [pendingVerifyFile, setPendingVerifyFile] = useState<File | null>(null);
+  const [pendingImportInvoices, setPendingImportInvoices] = useState<
+    MajikInvoice[]
+  >([]);
+
+  const [pendingBackupInvoices, setPendingBackupInvoices] = useState<
+    MajikInvoice[]
+  >([]);
+
+  const [pendingContactBackupSnapshot, setPendingContactBackupSnapshot] =
+    useState<ContactManagerSnapshot | null>(null);
+
+  const [pendingAppDataSnapshot, setPendingAppDataSnapshot] =
+    useState<AppDataSnapshot | null>(null);
+
+  const [csvInvoices, setCsvInvoices] = useState<MajikInvoice[]>([]);
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
 
@@ -200,101 +233,199 @@ function App(): JSX.Element {
 
     const register = async () => {
       const unlisteners = await Promise.all([
-        // ─────────────────────────────────────────────────────────────
-        // File
-        // ─────────────────────────────────────────────────────────────
-
-        // listen("trigger-sign-file", async () => {
-        //   try {
-        //     const selected = await open({
-        //       multiple: false,
-        //       filters: [{ name: "All Files", extensions: ["*"] }],
-        //     });
-        //     if (!selected) return;
-
-        //     const filePath = selected as string;
-        //     const uint8 = await readFile(filePath);
-        //     const fileName = await basename(filePath);
-        //     const file = new File([uint8], fileName);
-
-        //     // setPendingSignFile(file);
-        //     navigate("/sign");
-        //   } catch (error) {
-        //     console.error(error);
-        //     toast.error("Failed to open file for signing", {
-        //       description: (error as any)?.message || String(error),
-        //     });
-        //   }
-        // }),
-
-        // listen("trigger-verify-file", async () => {
-        //   try {
-        //     const selected = await open({
-        //       multiple: false,
-        //       filters: [{ name: "All Files", extensions: ["*"] }],
-        //     });
-        //     if (!selected) return;
-
-        //     const filePath = selected as string;
-        //     const uint8 = await readFile(filePath);
-        //     const fileName = await basename(filePath);
-        //     const file = new File([uint8], fileName);
-
-        //     // setPendingVerifyFile(file);
-        //     navigate("/verify");
-        //   } catch (error) {
-        //     console.error(error);
-        //     toast.error("Failed to open file for verification", {
-        //       description: (error as any)?.message || String(error),
-        //     });
-        //   }
-        // }),
-
         listen("trigger-import-invoice-mjki", async () => {
-          toast.info("Coming Soon", {
-            description:
-              "This feature will soon be available. Thank you for your patience.",
-            id: "toast-info-coming-soon",
-          });
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+          try {
+            const selected = await open({
+              multiple: true, // allow multi-file pick
+              filters: [{ name: "Majik Invoice", extensions: ["mjki", "*"] }],
+            });
+            if (!selected) return;
+
+            const paths = Array.isArray(selected) ? selected : [selected];
+
+            const parsed: MajikInvoice[] = [];
+            for (const filePath of paths) {
+              const uint8 = await readFile(filePath);
+              const invoice = MajikInvoice.fromBinary(uint8.buffer);
+              parsed.push(invoice);
+            }
+
+            if (parsed.length === 0) {
+              toast.error(
+                "No invoices could be parsed from the selected file(s).",
+              );
+              return;
+            }
+
+            setPendingImportInvoices(parsed);
+            setModalKey("import-invoice-mjki");
+          } catch (error) {
+            console.error(error);
+            toast.error("Failed to open invoice file", {
+              description: (error as any)?.message || String(error),
+            });
+          }
         }),
 
-        listen("trigger-import-invoice-csv", async () => {
-          toast.info("Coming Soon", {
-            description:
-              "This feature will soon be available. Thank you for your patience.",
-            id: "toast-info-coming-soon",
-          });
-        }),
+        listen("trigger-import-invoice-backup", async () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+          try {
+            const selected = await open({
+              multiple: false,
+              filters: [{ name: "Majik Backup", extensions: ["mjkbackup"] }],
+            });
+            if (!selected) return;
 
+            const filePath = selected as string;
+            const uint8 = await readFile(filePath);
+
+            const invoices = await majik.readInvoicesBackup(uint8);
+
+            if (invoices.length === 0) {
+              toast.warning("Empty backup", {
+                description:
+                  "No invoices were found in the selected backup file.",
+              });
+              return;
+            }
+
+            setPendingBackupInvoices(invoices);
+            setModalKey("import-invoice-backup");
+          } catch (error) {
+            console.error(error);
+            toast.error("Failed to read backup file", {
+              description: (error as any)?.message || String(error),
+            });
+          }
+        }),
         listen("trigger-export-contacts", async () => {
-          toast.info("Coming Soon", {
-            description:
-              "This feature will soon be available. Thank you for your patience.",
-            id: "toast-info-coming-soon",
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+          const backupBlob = await majik.backupContacts();
+          const blobBuffer = await backupBlob.arrayBuffer();
+
+          const backupFileName = `${activeAccount?.meta.label || activeAccount?.id || "User"}  - Contacts Backup`;
+
+          const filePath = await save({
+            defaultPath: backupFileName,
+            filters: [{ name: "Majik Backup", extensions: ["mjkbackup"] }],
+          });
+
+          if (!filePath) {
+            toast.info("Backup cancelled");
+            return;
+          } else {
+            await writeFile(filePath, new Uint8Array(blobBuffer));
+          }
+
+          toast.success("Contacts Backup Saved", {
+            description: `${backupFileName} exported successfully.`,
+          });
+
+          sendNotification({
+            title: "Contacts Backup Saved",
+            body: backupFileName,
           });
         }),
 
         listen("trigger-export-invoices-backup", async () => {
-          toast.info("Coming Soon", {
-            description:
-              "This feature will soon be available. Thank you for your patience.",
-            id: "toast-info-coming-soon",
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+          const backupBlob = majik.backupInvoices();
+          const blobBuffer = await backupBlob.arrayBuffer();
+
+          const backupFileName = `${activeAccount?.meta.label || activeAccount?.id || "User"}  - Invoice Backup`;
+
+          const filePath = await save({
+            defaultPath: backupFileName,
+            filters: [{ name: "Majik Backup", extensions: ["mjkbackup"] }],
+          });
+
+          if (!filePath) {
+            toast.info("Backup cancelled");
+            return;
+          } else {
+            await writeFile(filePath, new Uint8Array(blobBuffer));
+          }
+
+          toast.success("Invoice Backup Saved", {
+            description: `${backupFileName} exported successfully.`,
+          });
+
+          sendNotification({
+            title: "Invoice Backup Saved",
+            body: backupFileName,
           });
         }),
 
         listen("trigger-export-invoices-csv", async () => {
-          toast.info("Coming Soon", {
-            description:
-              "This feature will soon be available. Thank you for your patience.",
-            id: "toast-info-coming-soon",
-          });
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+          const list = majik.listInvoices();
+          setCsvInvoices(list);
+          setModalKey("export-invoice-csv");
         }),
 
         listen("trigger-export-app-data", async () => {
-          toast.info("Coming Soon", {
-            description:
-              "This feature will soon be available. Thank you for your patience.",
-            id: "toast-info-coming-soon",
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+          const backupBlob = await majik.backupAppData();
+          const blobBuffer = await backupBlob.arrayBuffer();
+
+          const backupFileName = `${activeAccount?.meta.label || activeAccount?.id || "User"}  - App Data Backup`;
+
+          const filePath = await save({
+            defaultPath: backupFileName,
+            filters: [{ name: "Majik Backup", extensions: ["mjkbackup"] }],
+          });
+
+          if (!filePath) {
+            toast.info("Backup cancelled");
+            return;
+          } else {
+            await writeFile(filePath, new Uint8Array(blobBuffer));
+          }
+
+          toast.success("App Data Backup Saved", {
+            description: `${backupFileName} exported successfully.`,
+          });
+
+          sendNotification({
+            title: "App Data Backup Saved",
+            body: backupFileName,
           });
         }),
 
@@ -303,16 +434,114 @@ function App(): JSX.Element {
         // ─────────────────────────────────────────────────────────────
 
         listen("trigger-import-contact", () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
           setModalKey("import-contact");
           navigate("/contacts");
         }),
 
+        listen("trigger-import-contact-backup", async () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+          try {
+            const selected = await open({
+              multiple: false,
+              filters: [{ name: "Majik Backup", extensions: ["mjkbackup"] }],
+            });
+            if (!selected) return;
+
+            const uint8 = await readFile(selected as string);
+            const snapshot = await majik.readContactsBackup(uint8);
+
+            if (snapshot.contacts.length === 0) {
+              toast.warning("Empty backup", {
+                description:
+                  "No contacts were found in the selected backup file.",
+              });
+              return;
+            }
+
+            setPendingContactBackupSnapshot(snapshot);
+            setModalKey("import-contact-backup");
+          } catch (error) {
+            console.error(error);
+            toast.error("Failed to read contact backup", {
+              description: (error as any)?.message || String(error),
+            });
+          }
+        }),
+
+        listen("trigger-import-app-data", async () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+          try {
+            const selected = await open({
+              multiple: false,
+              filters: [{ name: "Majik Backup", extensions: ["mjkbackup"] }],
+            });
+            if (!selected) return;
+
+            const uint8 = await readFile(selected as string);
+            const snapshot = await majik.readAppDataBackup(uint8);
+
+            const hasAnything =
+              snapshot.invoices.length > 0 ||
+              snapshot.contacts.length > 0 ||
+              snapshot.invoiceDefaults !== null ||
+              snapshot.preferences !== null;
+
+            if (!hasAnything) {
+              toast.warning("Empty backup", {
+                description: "This backup file appears to contain no data.",
+              });
+              return;
+            }
+
+            setPendingAppDataSnapshot(snapshot);
+            setModalKey("restore-backup");
+          } catch (error) {
+            console.error(error);
+            toast.error("Failed to read backup file", {
+              description: (error as any)?.message || String(error),
+            });
+          }
+        }),
+
         listen("trigger-switch-account", () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
           setModalKey("replace-account");
           navigate("/muid");
         }),
 
         listen("trigger-refresh-muid", async () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
           await majik.refreshMUID();
           setRefreshKey((prev) => prev + 1);
         }),
@@ -326,10 +555,24 @@ function App(): JSX.Element {
         }),
 
         listen("trigger-auth-sign-in", () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
           setModalKey("auth-majikah");
         }),
 
         listen("trigger-auth-sign-out", async () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
           if (!majikah.isAuthenticated) return;
 
           const run = async (): Promise<string> => {
@@ -357,11 +600,36 @@ function App(): JSX.Element {
         // ─────────────────────────────────────────────────────────────
 
         listen("trigger-manage-invoices", () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
           navigate("/invoices");
         }),
 
         listen("trigger-dashboard-summary", () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
           navigate("/dashboard");
+        }),
+
+        listen("trigger-invoice-settings", () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+          setModalKey("invoice-settings");
         }),
 
         // ─────────────────────────────────────────────────────────────
@@ -372,16 +640,30 @@ function App(): JSX.Element {
           dispatch(toggleTheme());
         }),
 
+        listen("trigger-user-preferences", () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+          setModalKey("user-preferences");
+        }),
+
         // ─────────────────────────────────────────────────────────────
         // Tools
         // ─────────────────────────────────────────────────────────────
 
         listen("trigger-export-majik-key", async () => {
-          toast.info("Coming Soon", {
-            description:
-              "This feature will soon be available. Thank you for your patience.",
-            id: "toast-info-coming-soon",
-          });
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+          setModalKey("export-majik-key");
         }),
 
         listen("trigger-validate-invoice", async () => {
@@ -391,18 +673,6 @@ function App(): JSX.Element {
             id: "toast-info-coming-soon",
           });
         }),
-
-        // launch-web-app
-        // system-status
-        // docs
-        // product-info
-        // developer
-        // report-issue
-        // submit-ticket
-        //
-        // NOTE:
-        // These are opened directly from Rust via open_url(...)
-        // so no frontend listener is needed unless behavior changes.
 
         // ─────────────────────────────────────────────────────────────
         // Help
@@ -416,26 +686,6 @@ function App(): JSX.Element {
             id: "toast-info-coming-soon",
           });
         }),
-
-        // ─────────────────────────────────────────────────────────────
-        // Legacy / Future
-        // ─────────────────────────────────────────────────────────────
-
-        // listen("trigger-sign-file", async () => {
-        //   TODO: Handle file signing
-        // }),
-
-        // listen("trigger-verify-file", async () => {
-        //   TODO: Handle file verification
-        // }),
-
-        // listen("trigger-create-account", async () => {
-        //   TODO: Handle account creation
-        // }),
-
-        // listen("trigger-import-account", async () => {
-        //   TODO: Handle account import
-        // }),
       ]);
 
       // Cleanup immediately if effect was already disposed
@@ -454,7 +704,7 @@ function App(): JSX.Element {
 
       handlers.forEach((fn) => fn());
     };
-  }, [majik, majikah, dispatch, navigate, tour, userAccounts.length]);
+  }, [majik, majikah, dispatch, navigate, tour, userAccounts.length, unlocked]);
   const handleCancel = (): void => {
     if (unlockResolver) unlockResolver("");
     setUnlockId(null);
@@ -595,48 +845,6 @@ function App(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAccount, refreshKey]);
 
-  // const tabs: RouterTabContent[] = [
-  //   {
-  //     id: "accounts",
-  //     route: "/accounts",
-  //     icon: IdentificationCardIcon,
-  //     name: "Majik Universal ID",
-  //     element: <UserMUIDPanel majik={majik} onUpdate={handleRefreshInstance} />,
-  //   },
-
-  //   {
-  //     id: "contacts",
-  //     route: "/contacts",
-  //     name: "Contacts",
-  //     icon: AddressBookIcon,
-  //     element: <ContactsPanel majik={majik} onUpdate={handleRefreshInstance} />,
-  //   },
-
-  //   {
-  //     id: "dashboard",
-  //     route: "/dashboard",
-  //     name: "Dashboard",
-  //     icon: ChartLineUpIcon,
-  //     element: <BuwizDashboardPanel majik={majik} />,
-  //   },
-
-  //   {
-  //     id: "invoices",
-  //     route: "/invoices",
-  //     name: "My Invoices",
-  //     icon: ReceiptIcon,
-  //     element: <InvoicesManager majik={majik} />,
-  //   },
-
-  //   {
-  //     id: "exchange",
-  //     route: "/exchange",
-  //     name: "Exchange",
-  //     icon: BankIcon,
-  //     element: <InvoiceExchangePanel majik={majik} />,
-  //   },
-  // ];
-
   return (
     <RootContainer>
       <MajikBuwizOnboardingGate
@@ -660,6 +868,15 @@ function App(): JSX.Element {
           onSwitchAccount={handleSwitchAccount}
           onReset={handleCancel}
           isUnlocking={isUnlocking}
+        />
+
+        <AppSettingsModal
+          majik={majik}
+          onSuccess={handleModalSuccess}
+          open={modalKey === "user-preferences"}
+          onOpenChange={(change) =>
+            setModalKey(change ? "user-preferences" : null)
+          }
         />
 
         <ReplaceKeyModal
@@ -688,6 +905,15 @@ function App(): JSX.Element {
           }
         />
 
+        <ExportAccountKeyModal
+          majik={majik}
+          onSuccess={handleModalSuccess}
+          open={modalKey === "export-majik-key"}
+          onOpenChange={(change) =>
+            setModalKey(change ? "export-majik-key" : null)
+          }
+        />
+
         <ImportContactModal
           majik={majik}
           onSuccess={handleModalSuccess}
@@ -695,6 +921,68 @@ function App(): JSX.Element {
           onOpenChange={(change) =>
             setModalKey(change ? "import-contact" : null)
           }
+        />
+
+        <ImportContactBackupModal
+          open={modalKey === "import-contact-backup"}
+          onOpenChange={(change) => {
+            setModalKey(change ? "import-contact-backup" : null);
+            if (!change) setPendingContactBackupSnapshot(null);
+          }}
+          majik={majik}
+          snapshot={pendingContactBackupSnapshot}
+          onSuccess={handleModalSuccess}
+        />
+
+        <ImportMJKIModal
+          open={modalKey === "import-invoice-mjki"}
+          onOpenChange={(change) => {
+            setModalKey(change ? "import-invoice-mjki" : null);
+            if (!change) setPendingImportInvoices([]); // clear on close
+          }}
+          majik={majik}
+          invoices={pendingImportInvoices}
+          onSuccess={handleModalSuccess}
+        />
+
+        <ImportInvoiceBackupModal
+          open={modalKey === "import-invoice-backup"}
+          onOpenChange={(change) => {
+            setModalKey(change ? "import-invoice-backup" : null);
+            if (!change) setPendingBackupInvoices([]); // clear on close
+          }}
+          majik={majik}
+          invoices={pendingBackupInvoices}
+          onSuccess={handleModalSuccess}
+        />
+
+        <ImportAppDataModal
+          open={modalKey === "restore-backup"}
+          onOpenChange={(change) => {
+            setModalKey(change ? "restore-backup" : null);
+            if (!change) setPendingAppDataSnapshot(null);
+          }}
+          majik={majik}
+          snapshot={pendingAppDataSnapshot}
+          onSuccess={handleModalSuccess}
+        />
+
+        <InvoiceSettingsModal
+          majik={majik}
+          onOpenChange={(change) =>
+            setModalKey(change ? "invoice-settings" : null)
+          }
+          open={modalKey === "invoice-settings"}
+        />
+
+        <CSVExportDialog
+          majik={majik}
+          isOpen={modalKey === "export-invoice-csv"}
+          onOpenChange={(change) =>
+            setModalKey(change ? "export-invoice-csv" : null)
+          }
+          invoices={csvInvoices}
+          scope={"all"}
         />
 
         <MajikahAuthModal

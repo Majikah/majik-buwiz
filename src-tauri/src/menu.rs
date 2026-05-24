@@ -34,13 +34,53 @@ pub fn build_menu(
     // Import Invoice submenu
     let import_invoice_mjki =
         MenuItem::with_id(app, "import-invoice-mjki", "from MJKI", true, None::<&str>)?;
-    let import_invoice_csv =
-        MenuItem::with_id(app, "import-invoice-csv", "from CSV", true, None::<&str>)?;
+    let import_invoice_backup = MenuItem::with_id(
+        app,
+        "import-invoice-backup",
+        "from Backup",
+        true,
+        None::<&str>,
+    )?;
     let import_invoice_submenu = Submenu::with_items(
         app,
-        "Import Invoice",
+        "Invoice",
         true,
-        &[&import_invoice_mjki, &import_invoice_csv],
+        &[&import_invoice_mjki, &import_invoice_backup],
+    )?;
+
+    // Import Invoice submenu
+    let import_contact_card = MenuItem::with_id(
+        app,
+        "import-contact",
+        "from Contact Card",
+        true,
+        None::<&str>,
+    )?;
+    let import_contact_backup = MenuItem::with_id(
+        app,
+        "import-contact-backup",
+        "from Backup",
+        true,
+        None::<&str>,
+    )?;
+    let import_contact_submenu = Submenu::with_items(
+        app,
+        "Contact",
+        true,
+        &[&import_contact_card, &import_contact_backup],
+    )?;
+    let import_app_data =
+        MenuItem::with_id(app, "import-app-data", "App Data", true, None::<&str>)?;
+
+    let import_file_submenu = Submenu::with_items(
+        app,
+        "Import",
+        true,
+        &[
+            &import_contact_submenu,
+            &import_invoice_submenu,
+            &import_app_data,
+        ],
     )?;
 
     // Export submenu
@@ -65,12 +105,8 @@ pub fn build_menu(
         &[&export_contacts, &export_invoices_submenu, &export_app_data],
     )?;
 
-    let file_menu = Submenu::with_items(
-        app,
-        "File",
-        true,
-        &[&import_invoice_submenu, &export_submenu],
-    )?;
+    let file_menu =
+        Submenu::with_items(app, "File", true, &[&import_file_submenu, &export_submenu])?;
 
     // ── Account ────────────────────────────────────────────────────────────
     let switch_account =
@@ -139,6 +175,9 @@ pub fn build_menu(
         None::<&str>,
     )?;
 
+    let invoice_settings =
+        MenuItem::with_id(app, "invoice-settings", "Settings", true, None::<&str>)?;
+
     // let generate_summary = MenuItem::with_id(
     //     app,
     //     "generate-summary",
@@ -155,6 +194,8 @@ pub fn build_menu(
             &manage_invoices,
             &dashboard_summary,
             &PredefinedMenuItem::separator(app)?,
+            &invoice_settings,
+            &PredefinedMenuItem::separator(app)?,
             &export_invoices_submenu, // &PredefinedMenuItem::separator(app)?,
                                       // &generate_summary,
         ],
@@ -168,7 +209,24 @@ pub fn build_menu(
         None::<&str>,
     )?;
 
-    let preferences_menu = Submenu::with_items(app, "Preferences", true, &[&toggle_dark_mode])?;
+    let user_preferences = MenuItem::with_id(
+        app,
+        "user-preferences",
+        "User Preferences",
+        true,
+        None::<&str>,
+    )?;
+
+    let preferences_menu = Submenu::with_items(
+        app,
+        "Preferences",
+        true,
+        &[
+            &toggle_dark_mode,
+            &PredefinedMenuItem::separator(app)?,
+            &user_preferences,
+        ],
+    )?;
 
     // ── Tools ──────────────────────────────────────────────────────────────
     let export_majik_key = MenuItem::with_id(
@@ -255,8 +313,11 @@ pub fn handle_menu_event(app: &AppHandle<tauri::Wry>, event_id: &str) {
         "import-invoice-mjki" => {
             let _ = app.emit("trigger-import-invoice-mjki", ());
         }
-        "import-invoice-csv" => {
-            let _ = app.emit("trigger-import-invoice-csv", ());
+        "import-invoice-backup" => {
+            let _ = app.emit("trigger-import-invoice-backup", ());
+        }
+        "import-app-data" => {
+            let _ = app.emit("trigger-import-app-data", ());
         }
         "export-contacts" => {
             let _ = app.emit("trigger-export-contacts", ());
@@ -277,6 +338,10 @@ pub fn handle_menu_event(app: &AppHandle<tauri::Wry>, event_id: &str) {
         }
         "import-contact" => {
             let _ = app.emit("trigger-import-contact", ());
+        }
+
+        "import-contact-backup" => {
+            let _ = app.emit("trigger-import-contact-backup", ());
         }
         "refresh-muid" => {
             let _ = app.emit("trigger-refresh-muid", ());
@@ -308,9 +373,17 @@ pub fn handle_menu_event(app: &AppHandle<tauri::Wry>, event_id: &str) {
             let _ = app.emit("trigger-dashboard-summary", ());
         }
 
+        "invoice-settings" => {
+            let _ = app.emit("trigger-invoice-settings", ());
+        }
+
         // ── Preferences ──────────────────────────────────────────────────────
         "toggle-dark-mode" => {
             let _ = app.emit("trigger-toggle-dark-mode", ());
+        }
+
+        "user-preferences" => {
+            let _ = app.emit("trigger-user-preferences", ());
         }
 
         // ── Tools ────────────────────────────────────────────────────────────

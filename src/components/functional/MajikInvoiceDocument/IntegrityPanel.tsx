@@ -18,6 +18,7 @@
 import React, { useCallback, useState } from "react";
 import styled from "styled-components";
 import {
+  BinaryIcon,
   CheckCircleIcon,
   CopyIcon,
   FilePdfIcon,
@@ -242,6 +243,7 @@ export interface IntegrityPanelProps {
   readonly: boolean;
   /** True when the parent's PDF export dialog should be opened. */
   onRequestPDFExport: () => void;
+  onRequestMJKIExport: () => void;
   onSign?: () => Promise<void>;
   onSeal?: () => Promise<void>;
   onVerify?: () => Promise<void>;
@@ -258,6 +260,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = React.memo(
     invoice,
     readonly,
     onRequestPDFExport,
+    onRequestMJKIExport,
     onSign,
     onSeal,
     onVerify,
@@ -392,6 +395,13 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = React.memo(
       <CtrlBtn onClick={onRequestPDFExport} disabled={busy === "pdf"}>
         <FilePdfIcon size={13} />
         {busy === "pdf" ? "Exporting…" : "Export PDF"}
+      </CtrlBtn>
+    );
+
+    const mjkiControl = (
+      <CtrlBtn onClick={onRequestMJKIExport} disabled={busy === "mjki"}>
+        <BinaryIcon size={13} />
+        {busy === "mjki" ? "Exporting…" : "Export as MJKI"}
       </CtrlBtn>
     );
 
@@ -572,6 +582,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = React.memo(
             {verifyControl}
             {encryptionControl}
             {pdfControl}
+            {mjkiControl}
           </CryptoControls>
         )}
 
@@ -581,6 +592,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = React.memo(
             {verifyControl}
             {encryptionControl}
             {pdfControl}
+            {mjkiControl}
           </CryptoControls>
         )}
       </Panel>

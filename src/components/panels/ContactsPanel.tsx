@@ -1,18 +1,16 @@
 import styled from "styled-components";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  AddressBookIcon,
   ListIcon,
   SquaresFourIcon,
-  UsersThreeIcon,
-  UserIcon,
-  XIcon,
+  TableIcon,
   StarIcon,
   PencilIcon,
-  AddressBookIcon,
+  UsersThreeIcon,
+  XIcon,
 } from "@phosphor-icons/react";
 
-import CBaseUserAccount from "../base/CBaseUserAccount";
-import ContactRow from "../base/ContactRow";
 import GuideHelper from "@/components/functional/GuideHelper";
 import { useShepherd } from "@/lib/shepherd-js/use-shepherd";
 import { launchTutorialContacts } from "@/lib/shepherd-js/tutorials/tutorial-contacts";
@@ -32,13 +30,17 @@ import {
   ContactGroupManagerModal,
 } from "./contacts/modals";
 
+// ── New decoupled view components ─────────────────────────────────────────────
+import { ContactsSearchBar } from "./contacts/elements/ContactsSearchBar";
+import { ContactsGrid } from "./contacts/elements/ContactsGrid";
+import { ContactsList } from "./contacts/elements/ContactsList";
+import { ContactsTable } from "./contacts/elements/ContactsTable";
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MAX_CONTACTS_LIMIT = 1000;
-const LIST_DEFAULT_THRESHOLD = 10;
-const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".split("");
 const DEFAULT_GROUP_COLOR = "#ea7f05";
 
-type ViewMode = "grid" | "list";
+type ViewMode = "grid" | "list" | "table";
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 const Root = styled.div`
@@ -288,7 +290,6 @@ const FilterClearBtn = styled.button`
   border-radius: 4px;
   transition: opacity 150ms ease;
   padding: 0;
-
   &:hover {
     opacity: 1;
   }
@@ -300,12 +301,12 @@ const BodyWrapper = styled.div`
   overflow: hidden;
   position: relative;
   display: flex;
+  flex-direction: column;
 `;
 
-const Body = styled.div<{ $isListView: boolean }>`
+const Body = styled.div<{ $padded: boolean }>`
   flex: 1;
   overflow-y: auto;
-  padding: ${({ $isListView }) => ($isListView ? "0" : "16px 18px 24px")};
 
   scrollbar-width: thin;
   scrollbar-color: ${({ theme }) =>
@@ -319,174 +320,6 @@ const Body = styled.div<{ $isListView: boolean }>`
     border-radius: 4px;
   }
 `;
-
-const Grid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
-  gap: 10px;
-
-  @media (max-width: 640px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const AlphaSection = styled.div`
-  display: flex;
-  flex-direction: column;
-`;
-
-const AlphaHeader = styled.div`
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 18px 5px;
-  background: ${({ theme }) => theme.colors.primaryBackground}f0;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-bottom: 1px solid ${({ theme }) => theme.colors.secondaryBackground}66;
-`;
-
-const AlphaLetter = styled.span`
-  font-family: "Fira Mono", "JetBrains Mono", monospace;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  color: ${({ theme }) => theme.colors.primary};
-  text-transform: uppercase;
-`;
-
-const AlphaCount = styled.span`
-  font-family: "Fira Mono", "JetBrains Mono", monospace;
-  font-size: 9px;
-  color: ${({ theme }) => theme.colors.textSecondary};
-  opacity: 0.4;
-  letter-spacing: 0.04em;
-`;
-
-const AlphaScrollbar = styled.div`
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 18px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 0;
-  z-index: 20;
-  gap: 1px;
-  user-select: none;
-
-  @media (max-width: 640px) {
-    width: 16px;
-  }
-`;
-
-const AlphaScrollBtn = styled.button<{ $active: boolean; $hasItems: boolean }>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  border: none;
-  background: transparent;
-  cursor: ${({ $hasItems }) => ($hasItems ? "pointer" : "default")};
-  font-family: "Fira Mono", "JetBrains Mono", monospace;
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0;
-  border-radius: 4px;
-  transition: all 100ms ease;
-  color: ${({ $active, $hasItems, theme }) =>
-    $active
-      ? theme.colors.primary
-      : $hasItems
-        ? theme.colors.textSecondary
-        : theme.colors.textSecondary};
-  opacity: ${({ $hasItems, $active }) =>
-    $active ? 1 : $hasItems ? 0.55 : 0.18};
-  background: ${({ $active, theme }) =>
-    $active ? `${theme.colors.primary}22` : "transparent"};
-
-  &:hover {
-    opacity: ${({ $hasItems }) => ($hasItems ? 1 : 0.18)};
-    background: ${({ $hasItems, theme }) =>
-      $hasItems ? `${theme.colors.primary}15` : "transparent"};
-    color: ${({ $hasItems, theme }) =>
-      $hasItems ? theme.colors.primary : theme.colors.textSecondary};
-  }
-`;
-
-const AlphaBubble = styled.div<{ $visible: boolean }>`
-  position: absolute;
-  right: 22px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: "Fira Mono", "JetBrains Mono", monospace;
-  font-size: 18px;
-  font-weight: 700;
-  pointer-events: none;
-  z-index: 30;
-  transition: opacity 200ms ease;
-  opacity: ${({ $visible }) => ($visible ? 1 : 0)};
-  background: ${({ theme }) => theme.colors.primary};
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
-`;
-
-const EmptyState = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 80px 24px;
-  text-align: center;
-`;
-
-const EmptyIcon = styled.div`
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  background: ${({ theme }) => theme.colors.secondaryBackground};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: ${({ theme }) => theme.colors.textSecondary};
-  opacity: 0.5;
-`;
-
-const EmptyTitle = styled.p`
-  font-size: 13px;
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.textPrimary};
-  margin: 0;
-`;
-
-const EmptyHint = styled.p`
-  font-size: 12px;
-  color: ${({ theme }) => theme.colors.textSecondary};
-  margin: 0;
-  max-width: 220px;
-  line-height: 1.55;
-  opacity: 0.6;
-`;
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function getContactLetter(label: string): string {
-  const first = (label || "?").trim()[0]?.toUpperCase();
-  return /[A-Z]/.test(first ?? "") ? (first ?? "#") : "#";
-}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface ContactsPanelProps {
@@ -502,13 +335,6 @@ const ContactsPanel: React.FC<ContactsPanelProps> = ({ majik, onUpdate }) => {
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
-  // ── Alpha scrollbar ────────────────────────────────────────────────────────
-  const [activeLetter, setActiveLetter] = useState<string | null>(null);
-  const [bubbleVisible, setBubbleVisible] = useState(false);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   // ── Group filter ───────────────────────────────────────────────────────────
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
 
@@ -523,7 +349,12 @@ const ContactsPanel: React.FC<ContactsPanelProps> = ({ majik, onUpdate }) => {
   const [isEditMetaOpen, setIsEditMetaOpen] = useState(false);
 
   // ── View mode ──────────────────────────────────────────────────────────────
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
+
+  // ── Search / filter ────────────────────────────────────────────────────────
+  const [filteredContacts, setFilteredContacts] = useState<
+    MajikInvoiceContact[]
+  >([]);
 
   // ── Data ───────────────────────────────────────────────────────────────────
   const contacts = useMemo(() => {
@@ -548,33 +379,16 @@ const ContactsPanel: React.FC<ContactsPanelProps> = ({ majik, onUpdate }) => {
     [groups, activeGroupId],
   );
 
-  const displayedContacts = useMemo(() => {
+  const groupFilteredContacts = useMemo(() => {
     if (!activeGroupId || !activeGroup) return contacts;
     const memberIds = new Set(activeGroup.listMemberIds());
     return contacts.filter((c) => memberIds.has(c.id));
   }, [contacts, activeGroupId, activeGroup]);
 
-  const grouped = useMemo(() => {
-    const sorted = [...displayedContacts].sort((a, b) =>
-      (a.meta?.label || "")
-        .toLowerCase()
-        .localeCompare((b.meta?.label || "").toLowerCase()),
-    );
-    const map: Record<string, typeof contacts> = {};
-    for (const c of sorted) {
-      const letter = getContactLetter(c.meta?.label || "");
-      if (!map[letter]) map[letter] = [];
-      map[letter].push(c);
-    }
-    return map;
-  }, [displayedContacts]);
-
-  const presentLetters = useMemo(() => Object.keys(grouped).sort(), [grouped]);
-
   // Sync view mode based on count
-  useEffect(() => {
-    setViewMode(contacts.length > LIST_DEFAULT_THRESHOLD ? "list" : "grid");
-  }, [contacts.length]);
+  // useEffect(() => {
+  //   setViewMode(contacts.length > LIST_DEFAULT_THRESHOLD ? "table" : "grid");
+  // }, [contacts.length]);
 
   // ── Event listeners ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -582,11 +396,11 @@ const ContactsPanel: React.FC<ContactsPanelProps> = ({ majik, onUpdate }) => {
     const handler = (): void => {
       refresh();
       onUpdate?.(majik);
-      console.log("New Event")
     };
     const events = [
       "new-contact",
       "removed-contact",
+      "updated-contact",
       "new-contact-group",
       "removed-contact-group",
       "contact-group-change",
@@ -615,7 +429,8 @@ const ContactsPanel: React.FC<ContactsPanelProps> = ({ majik, onUpdate }) => {
   }, []);
 
   const handleDelete = useCallback(
-    async (id: string): Promise<void> => {
+    async (contact: MajikInvoiceContact | string): Promise<void> => {
+      const id = typeof contact === "string" ? contact : contact.id;
       try {
         await majik.removeContact(id);
         onUpdate?.(majik);
@@ -629,6 +444,41 @@ const ContactsPanel: React.FC<ContactsPanelProps> = ({ majik, onUpdate }) => {
       }
     },
     [majik, onUpdate, refresh],
+  );
+
+  const handleBulkDelete = useCallback(
+    async (selected: MajikInvoiceContact[]): Promise<void> => {
+      try {
+        for (const c of selected) {
+          await majik.removeContact(c.id);
+        }
+        onUpdate?.(majik);
+        refresh();
+        toast.success(
+          `Deleted ${selected.length} contact${selected.length !== 1 ? "s" : ""}`,
+        );
+      } catch (err) {
+        toast.error("Bulk delete failed", {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          description: (err as any)?.message || err,
+        });
+      }
+    },
+    [majik, onUpdate, refresh],
+  );
+
+  /**
+   * Placeholder for bulk backup export.
+   * TODO: Implement actual backup file generation (e.g. zip of .mjkc contact cards).
+   */
+  const handleBulkExportBackup = useCallback(
+    (_selected: MajikInvoiceContact[]): void => {
+      toast.info("Backup export coming soon", {
+        description: `Export of ${_selected.length} contacts is not yet implemented.`,
+        id: "contacts-bulk-export-placeholder",
+      });
+    },
+    [],
   );
 
   const handleDownloadCard = useCallback(
@@ -670,28 +520,21 @@ const ContactsPanel: React.FC<ContactsPanelProps> = ({ majik, onUpdate }) => {
     [majik],
   );
 
-  const scrollToLetter = useCallback(
-    (letter: string) => {
-      if (!grouped[letter]) return;
-      const el = sectionRefs.current[letter];
-      if (el && bodyRef.current) {
-        bodyRef.current.scrollTo({ top: el.offsetTop, behavior: "smooth" });
-      }
-      setActiveLetter(letter);
-      setBubbleVisible(true);
-      if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
-      bubbleTimerRef.current = setTimeout(() => {
-        setBubbleVisible(false);
-        setActiveLetter(null);
-      }, 800);
-    },
-    [grouped],
-  );
-
   // ── Derived ────────────────────────────────────────────────────────────────
   const atLimitContact = contacts.length >= MAX_CONTACTS_LIMIT;
-  const isListView = viewMode === "list";
   const activeGroupColor = activeGroup?.meta?.color || DEFAULT_GROUP_COLOR;
+
+  // displayedContacts = group filter → then search/fuse filter
+  // ContactsSearchBar operates on groupFilteredContacts and emits filteredContacts
+  const displayedContacts = filteredContacts;
+
+  // Subtitle
+  const subtitle = useMemo(() => {
+    const total = groupFilteredContacts.length;
+    const shown = displayedContacts.length;
+    if (shown === total) return `${total} / ${MAX_CONTACTS_LIMIT} contacts`;
+    return `${shown} of ${total} contacts`;
+  }, [groupFilteredContacts.length, displayedContacts.length]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -708,9 +551,7 @@ const ContactsPanel: React.FC<ContactsPanelProps> = ({ majik, onUpdate }) => {
             <AddressBookIcon size={16} weight="duotone" />
             Contacts
           </PanelTitle>
-          <PanelSubtitle>
-            {contacts.length} / {MAX_CONTACTS_LIMIT} contacts
-          </PanelSubtitle>
+          <PanelSubtitle>{subtitle}</PanelSubtitle>
         </HeaderLeft>
 
         <HeaderActions>
@@ -731,6 +572,13 @@ const ContactsPanel: React.FC<ContactsPanelProps> = ({ majik, onUpdate }) => {
                 title="List view"
               >
                 <ListIcon size={14} />
+              </ToggleBtn>
+              <ToggleBtn
+                $active={viewMode === "table"}
+                onClick={() => setViewMode("table")}
+                title="Table view"
+              >
+                <TableIcon size={14} />
               </ToggleBtn>
             </ViewToggle>
           )}
@@ -786,8 +634,8 @@ const ContactsPanel: React.FC<ContactsPanelProps> = ({ majik, onUpdate }) => {
         <FilterBanner $color={activeGroupColor}>
           <UsersThreeIcon size={12} color={activeGroupColor} />
           <FilterLabel $color={activeGroupColor}>
-            {activeGroup.meta.name} · {displayedContacts.length} member
-            {displayedContacts.length !== 1 ? "s" : ""}
+            {activeGroup.meta.name} · {groupFilteredContacts.length} member
+            {groupFilteredContacts.length !== 1 ? "s" : ""}
           </FilterLabel>
           <FilterClearBtn
             onClick={() => setActiveGroupId(null)}
@@ -798,92 +646,65 @@ const ContactsPanel: React.FC<ContactsPanelProps> = ({ majik, onUpdate }) => {
         </FilterBanner>
       )}
 
+      {/* ── Search bar ── */}
+      <ContactsSearchBar
+        contacts={groupFilteredContacts}
+        onFilter={setFilteredContacts}
+      />
+
       {/* ── Body ── */}
       <BodyWrapper>
-        <Body $isListView={isListView} ref={bodyRef}>
-          {displayedContacts.length === 0 ? (
-            <EmptyState>
-              <EmptyIcon>
-                {activeGroup ? (
-                  <UsersThreeIcon size={22} />
-                ) : (
-                  <UserIcon size={22} />
-                )}
-              </EmptyIcon>
-              <EmptyTitle>
-                {activeGroup
+        <Body $padded={viewMode === "grid"}>
+          {viewMode === "grid" && (
+            <ContactsGrid
+              contacts={displayedContacts}
+              emptyTitle={
+                activeGroup
                   ? `No members in ${activeGroup.meta.name}`
-                  : "No contacts yet"}
-              </EmptyTitle>
-              <EmptyHint>
-                {activeGroup
+                  : "No contacts yet"
+              }
+              emptyHint={
+                activeGroup
                   ? "Open the group manager to add contacts."
-                  : "You haven't added any contacts yet."}
-              </EmptyHint>
-            </EmptyState>
-          ) : isListView ? (
-            <>
-              {presentLetters.map((letter) => {
-                const items = grouped[letter] ?? [];
-                return (
-                  <AlphaSection
-                    key={letter}
-                    ref={(el) => {
-                      sectionRefs.current[letter] = el;
-                    }}
-                  >
-                    <AlphaHeader>
-                      <AlphaLetter>{letter}</AlphaLetter>
-                      <AlphaCount>{items.length}</AlphaCount>
-                    </AlphaHeader>
-                    {items.map((c) => (
-                      <ContactRow
-                        key={c.id}
-                        itemData={c}
-                        isActiveAccount={false}
-                        onDelete={() => handleDelete(c.id)}
-                        onEdit={handleOpenEditMeta}
-                      />
-                    ))}
-                  </AlphaSection>
-                );
-              })}
-            </>
-          ) : (
-            <Grid>
-              {displayedContacts.map((c) => (
-                <CBaseUserAccount
-                  key={c.id}
-                  itemData={c}
-                  onDelete={() => handleDelete(c.id)}
-                  onEdit={handleOpenEditMeta}
-                  onDownload={() => handleDownloadCard(c)}
-                />
-              ))}
-            </Grid>
+                  : "You haven't added any contacts yet."
+              }
+              onDelete={(c) => handleDelete(c)}
+              onEdit={handleOpenEditMeta}
+              onDownload={handleDownloadCard}
+            />
+          )}
+
+          {viewMode === "list" && (
+            <ContactsList
+              contacts={displayedContacts}
+              emptyIsGroup={!!activeGroup}
+              emptyTitle={
+                activeGroup
+                  ? `No members in ${activeGroup.meta.name}`
+                  : "No contacts yet"
+              }
+              emptyHint={
+                activeGroup
+                  ? "Open the group manager to add contacts."
+                  : "You haven't added any contacts yet."
+              }
+              onDelete={(c) => handleDelete(c)}
+              onEdit={handleOpenEditMeta}
+            />
+          )}
+
+          {viewMode === "table" && (
+            <ContactsTable
+              contacts={displayedContacts}
+              pageSize={50}
+              paginationAt="both"
+              onEdit={handleOpenEditMeta}
+              onDelete={(c) => handleDelete(c)}
+              onBulkDelete={handleBulkDelete}
+              onBulkExportBackup={handleBulkExportBackup}
+            />
           )}
         </Body>
-
-        {isListView && displayedContacts.length > 0 && (
-          <AlphaScrollbar>
-            {ALPHABET.map((letter) => {
-              const hasItems = !!grouped[letter];
-              return (
-                <AlphaScrollBtn
-                  key={letter}
-                  $active={activeLetter === letter}
-                  $hasItems={hasItems}
-                  onClick={() => hasItems && scrollToLetter(letter)}
-                  aria-label={`Jump to ${letter}`}
-                >
-                  {letter}
-                </AlphaScrollBtn>
-              );
-            })}
-          </AlphaScrollbar>
-        )}
-
-        <AlphaBubble $visible={bubbleVisible}>{activeLetter ?? ""}</AlphaBubble>
       </BodyWrapper>
 
       {/* ── Modals ── */}
