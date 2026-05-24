@@ -14,7 +14,7 @@
     "stage:assets": "robocopy msix\\Assets dist\\msix-staging\\Assets /E || exit 0",
     "stage:manifest": "copy msix\\AppxManifest.xml dist\\msix-staging\\",
     "stage": "mkdir .\\dist\\msix-staging  && npm run stage:exe && npm run stage:assets && npm run stage:manifest",
-    "package:msix": "npx winapp pack .\\dist\\msix-staging --cert .\\devcert.pfx --output .\\dist\\majik-buwiz.0.1.2_x64.msix",
+    "package:msix": "npx winapp pack .\\dist\\msix-staging --cert .\\devcert.pfx --output .\\dist\\majik-buwiz.0.1.3_x64.msix",
     "package": "npm run tauri:build && npm run stage && npm run package:msix",
     "generate:icons:appx": "npx tsx scripts/generate-icons.ts",
     "generate:icons:tauri": "npx tauri icon ./icon.png",
