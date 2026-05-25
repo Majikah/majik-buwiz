@@ -705,6 +705,8 @@ function App(): JSX.Element {
       handlers.forEach((fn) => fn());
     };
   }, [majik, majikah, dispatch, navigate, tour, userAccounts.length, unlocked]);
+
+  
   const handleCancel = (): void => {
     if (unlockResolver) unlockResolver("");
     setUnlockId(null);

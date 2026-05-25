@@ -762,11 +762,27 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
     try {
       const currentKey = majik.getActiveAccountKey();
 
-      if (currentKey?.isLocked) {
-        const invoices = majik.listInvoices();
-        setInvoices(invoices);
+      if (!currentKey) return;
+
+      if (currentKey.isLocked) {
+        const { items } = await majik.queryInvoicesAdvanced({
+          publicKey: currentKey.fingerprint,
+          issuedAt: {
+            from: range.from.toISOString(),
+            to: range.to.toISOString(),
+          },
+        });
+        setInvoices(items);
       } else {
-        const { decrypted } = await majik.decryptCachedInvoices();
+        const { items } = await majik.queryInvoicesAdvanced({
+          publicKey: currentKey.fingerprint,
+          issuedAt: {
+            from: range.from.toISOString(),
+            to: range.to.toISOString(),
+          },
+        });
+        const { decrypted } = await majik.decryptInvoices(items);
+        // const { decrypted } = await majik.decryptCachedInvoices();
         setInvoices(decrypted);
       }
     } catch (err) {

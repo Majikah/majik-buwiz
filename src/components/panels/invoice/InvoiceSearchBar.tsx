@@ -27,6 +27,8 @@ import React, {
 } from "react";
 import styled, { css } from "styled-components";
 import {
+  CalendarDotsIcon,
+  CheckIcon,
   FunnelIcon,
   MagnifyingGlassIcon,
   SlidersIcon,
@@ -34,6 +36,7 @@ import {
 } from "@phosphor-icons/react";
 import Fuse from "fuse.js";
 import type { MajikInvoice } from "@majikah/majik-invoice";
+import { InvoiceDateRangeFilter } from "@/SDK/majik-buwiz-client/src/core/invoice/invoice-manager";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,10 +52,13 @@ export type InvoiceFilterStatus =
 export type InvoiceFilterSealed = "sealed" | "unsealed";
 export type InvoiceFilterMode = "signed-only" | "encrypted-and-signed";
 
+// Replace the existing InvoiceActiveFilters interface
 export interface InvoiceActiveFilters {
   status: InvoiceFilterStatus | null;
   sealed: InvoiceFilterSealed | null;
   mode: InvoiceFilterMode | null;
+  dateField: "issuedAt" | "createdAt";
+  dateRange: InvoiceDateRangeFilter | null;
 }
 
 export interface InvoiceSearchBarProps {
@@ -405,6 +411,178 @@ const ResetBtn = styled.button`
   }
 `;
 
+// ── Date range filter ──────────────────────────────────────────────────────
+
+const DateRangeWrap = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+`;
+
+const DateFieldToggle = styled.div`
+  display: inline-flex;
+  background: ${({ theme }) => theme.colors.secondaryBackground};
+  border: 1px solid ${({ theme }) => theme.colors.primary}18;
+  border-radius: ${({ theme }) => theme.borders.radius.medium};
+  padding: 2px;
+`;
+
+const DateFieldBtn = styled.button<{ $active: boolean }>`
+  font-family: ${({ theme }) => theme.typography.fonts.medium};
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: calc(${({ theme }) => theme.borders.radius.medium} - 2px);
+  border: none;
+  cursor: pointer;
+  transition: all 0.13s;
+
+  ${({ $active, theme }) =>
+    $active
+      ? css`
+          background: ${theme.gradients.primary};
+          color: ${theme.colors.static.white};
+        `
+      : css`
+          background: transparent;
+          color: ${theme.colors.textSecondary};
+          &:hover {
+            background: ${theme.colors.primarySoft};
+            color: ${theme.colors.primary};
+          }
+        `}
+`;
+
+const DatePickerAnchor = styled.div`
+  position: relative;
+`;
+
+const DatePickerBtn = styled.button<{ $active: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: ${({ theme }) => theme.typography.fonts.medium};
+  font-size: 10px;
+  padding: 4px 9px;
+  border-radius: ${({ theme }) => theme.borders.radius.rounded};
+  cursor: pointer;
+  transition: all 0.12s;
+
+  ${({ $active, theme }) =>
+    $active
+      ? css`
+          background: ${theme.colors.primarySoft};
+          color: ${theme.colors.primary};
+          border: 1px solid ${theme.colors.primary}44;
+        `
+      : css`
+          background: transparent;
+          color: ${theme.colors.textSecondary};
+          border: 1px solid ${theme.colors.primary}18;
+          opacity: 0.75;
+          &:hover {
+            background: ${theme.colors.primarySoft};
+            color: ${theme.colors.primary};
+            border-color: ${theme.colors.primary}33;
+            opacity: 1;
+          }
+        `}
+`;
+
+const DateDropdown = styled.div`
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 60;
+  min-width: 240px;
+  background: ${({ theme }) => theme.colors.secondaryBackground};
+  border: 1px solid ${({ theme }) => theme.colors.primary}22;
+  border-radius: ${({ theme }) => theme.borders.radius.medium};
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const DateDropLabel = styled.label`
+  font-family: ${({ theme }) => theme.typography.fonts.medium};
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  opacity: 0.6;
+`;
+
+const DateDropInput = styled.input`
+  font-family: ${({ theme }) => theme.typography.fonts.numbers};
+  font-size: 12px;
+  padding: 6px 9px;
+  border-radius: ${({ theme }) => theme.borders.radius.small};
+  border: 1px solid ${({ theme }) => theme.colors.primary}28;
+  background: ${({ theme }) => theme.colors.primaryBackground};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+
+  &:focus {
+    border-color: ${({ theme }) => theme.colors.primary};
+  }
+`;
+
+const DateDropRow = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+`;
+
+const DateDropActions = styled.div`
+  display: flex;
+  gap: 6px;
+  padding-top: 2px;
+`;
+
+const DateApplyBtn = styled.button`
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-family: ${({ theme }) => theme.typography.fonts.medium};
+  font-size: 11px;
+  padding: 6px;
+  border-radius: ${({ theme }) => theme.borders.radius.small};
+  background: ${({ theme }) => theme.gradients.primary};
+  border: none;
+  color: ${({ theme }) => theme.colors.static.white};
+  cursor: pointer;
+  &:hover {
+    filter: brightness(1.08);
+  }
+`;
+
+const DateClearBtn = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-family: ${({ theme }) => theme.typography.fonts.medium};
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: ${({ theme }) => theme.borders.radius.small};
+  border: 1px solid ${({ theme }) => theme.colors.primary}22;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  cursor: pointer;
+  &:hover {
+    background: ${({ theme }) => theme.colors.primarySoft};
+    color: ${({ theme }) => theme.colors.primary};
+  }
+`;
+
+
+
 // ---------------------------------------------------------------------------
 // InvoiceSearchBar
 // ---------------------------------------------------------------------------
@@ -421,7 +599,14 @@ export const InvoiceSearchBar: React.FC<InvoiceSearchBarProps> = ({
     status: null,
     sealed: null,
     mode: null,
+    dateField: "issuedAt",
+    dateRange: null,
   });
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [fromInput, setFromInput] = useState("");
+  const [toInput, setToInput] = useState("");
+  const datePickerRef = useRef<HTMLDivElement>(null);
+
   const [colPopoverOpen, setColPopoverOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -456,13 +641,27 @@ export const InvoiceSearchBar: React.FC<InvoiceSearchBarProps> = ({
   // ── Combined filter + search ──────────────────────────────────────────────
 
   useEffect(() => {
+    if (!datePickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        datePickerRef.current &&
+        !datePickerRef.current.contains(e.target as Node)
+      ) {
+        setDatePickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [datePickerOpen]);
+
+  useEffect(() => {
     // 1. Fuzzy search
     let result: MajikInvoice[] =
       query.trim().length >= 2
         ? fuse.search(query).map((r) => r.item._raw)
         : invoices;
 
-    // 2. Hard filters
+    // 2. Status
     if (filters.status) {
       const s = filters.status;
       result = result.filter((inv) => {
@@ -474,14 +673,33 @@ export const InvoiceSearchBar: React.FC<InvoiceSearchBarProps> = ({
       });
     }
 
+    // 3. Sealed
     if (filters.sealed) {
       const isSealed = filters.sealed === "sealed";
       result = result.filter((inv) => inv.isSealed === isSealed);
     }
 
+    // 4. Mode
     if (filters.mode) {
       const m = filters.mode;
       result = result.filter((inv) => inv.mode === m);
+    }
+
+    // 5. Date range — in-memory filter (mirrors what queryAdvanced does server-side)
+    if (filters.dateRange && (filters.dateRange.from || filters.dateRange.to)) {
+      const { from, to } = filters.dateRange;
+      result = result.filter((inv) => {
+        // Pick the right field based on dateField toggle
+        const raw =
+          filters.dateField === "issuedAt"
+            ? (inv.public?.issuedAt ?? "")
+            : (inv.createdAt ?? "");
+
+        if (!raw) return false;
+        if (from && raw < from) return false;
+        if (to && raw > to) return false;
+        return true;
+      });
     }
 
     onFilter(result);
@@ -508,6 +726,32 @@ export const InvoiceSearchBar: React.FC<InvoiceSearchBarProps> = ({
       ...prev,
       mode: prev.mode === m ? null : m,
     }));
+  }, []);
+
+  const applyDateRange = useCallback(() => {
+    // At least one bound must be set
+    if (!fromInput && !toInput) return;
+    setFilters((prev) => ({
+      ...prev,
+      dateRange: {
+        from: fromInput || undefined,
+        to: toInput || undefined,
+      },
+    }));
+    setDatePickerOpen(false);
+  }, [fromInput, toInput]);
+
+  const clearDateRange = useCallback(() => {
+    setFromInput("");
+    setToInput("");
+    setFilters((prev) => ({ ...prev, dateRange: null }));
+    setDatePickerOpen(false);
+  }, []);
+
+  const toggleDateField = useCallback((field: "issuedAt" | "createdAt") => {
+    setFilters((prev) => ({ ...prev, dateField: field, dateRange: null }));
+    setFromInput("");
+    setToInput("");
   }, []);
 
   // ── Column popover — close on outside click ───────────────────────────────
@@ -637,6 +881,138 @@ export const InvoiceSearchBar: React.FC<InvoiceSearchBarProps> = ({
           </FilterChip>
         ))}
       </FilterGroup>
+
+      <Divider />
+
+      {/* ── Date range filter ── */}
+      <DateRangeWrap>
+        <FilterLabel>
+          <CalendarDotsIcon size={10} weight="fill" />
+          Date
+        </FilterLabel>
+
+        {/* Issued / Created toggle */}
+        <DateFieldToggle>
+          <DateFieldBtn
+            $active={filters.dateField === "issuedAt"}
+            onClick={() => toggleDateField("issuedAt")}
+            title="Filter by issue date"
+          >
+            Issued
+          </DateFieldBtn>
+          <DateFieldBtn
+            $active={filters.dateField === "createdAt"}
+            onClick={() => toggleDateField("createdAt")}
+            title="Filter by creation date"
+          >
+            Created
+          </DateFieldBtn>
+        </DateFieldToggle>
+
+        {/* Date picker button + dropdown */}
+        <DatePickerAnchor ref={datePickerRef}>
+          <DatePickerBtn
+            $active={!!filters.dateRange || datePickerOpen}
+            onClick={() => setDatePickerOpen((v) => !v)}
+          >
+            <CalendarDotsIcon size={11} />
+            {filters.dateRange
+              ? [
+                  filters.dateRange.from
+                    ? new Date(filters.dateRange.from).toLocaleDateString(
+                        "en-PH",
+                        { month: "short", day: "numeric", year: "numeric" },
+                      )
+                    : "Any",
+                  "—",
+                  filters.dateRange.to
+                    ? new Date(filters.dateRange.to).toLocaleDateString(
+                        "en-PH",
+                        { month: "short", day: "numeric", year: "numeric" },
+                      )
+                    : "Any",
+                ].join(" ")
+              : "Any range"}
+            {filters.dateRange && (
+              <ChipX
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearDateRange();
+                }}
+              >
+                <XIcon size={8} weight="bold" />
+              </ChipX>
+            )}
+          </DatePickerBtn>
+
+          {datePickerOpen && (
+            <DateDropdown>
+              <DateDropRow>
+                <DateDropLabel>From</DateDropLabel>
+                <DateDropInput
+                  type="date"
+                  value={fromInput}
+                  onChange={(e) => setFromInput(e.target.value)}
+                />
+              </DateDropRow>
+              <DateDropRow>
+                <DateDropLabel>To</DateDropLabel>
+                <DateDropInput
+                  type="date"
+                  value={toInput}
+                  onChange={(e) => setToInput(e.target.value)}
+                />
+              </DateDropRow>
+
+              {/* Quick presets */}
+              <DateDropRow>
+                <DateDropLabel>Quick</DateDropLabel>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                  {[
+                    { label: "Today", days: 0 },
+                    { label: "7d", days: 7 },
+                    { label: "30d", days: 30 },
+                    { label: "90d", days: 90 },
+                    { label: "YTD", days: -1 }, // special
+                  ].map(({ label, days }) => (
+                    <FilterChip
+                      key={label}
+                      $active={false}
+                      onClick={() => {
+                        const now = new Date();
+                        const to = now.toISOString().slice(0, 10);
+                        let from: string;
+                        if (days === 0) {
+                          from = to;
+                        } else if (days === -1) {
+                          // YTD
+                          from = `${now.getFullYear()}-01-01`;
+                        } else {
+                          const d = new Date(now);
+                          d.setDate(d.getDate() - days);
+                          from = d.toISOString().slice(0, 10);
+                        }
+                        setFromInput(from);
+                        setToInput(to);
+                      }}
+                    >
+                      {label}
+                    </FilterChip>
+                  ))}
+                </div>
+              </DateDropRow>
+
+              <DateDropActions>
+                <DateClearBtn onClick={clearDateRange}>Clear</DateClearBtn>
+                <DateApplyBtn onClick={applyDateRange}>
+                  <CheckIcon size={12} weight="bold" />
+                  Apply
+                </DateApplyBtn>
+              </DateDropActions>
+            </DateDropdown>
+          )}
+        </DatePickerAnchor>
+      </DateRangeWrap>
 
       <Divider />
 

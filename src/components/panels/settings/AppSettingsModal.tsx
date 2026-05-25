@@ -20,7 +20,6 @@ import {
   MoonIcon,
   SunIcon,
   ReceiptIcon,
-  GaugeIcon,
   ShieldCheckIcon,
   PaletteIcon,
 } from "@phosphor-icons/react";
@@ -225,29 +224,62 @@ AppearancePanel.displayName = "AppearancePanel";
 // Panel: Dashboard
 // ---------------------------------------------------------------------------
 
-interface DashboardPanelProps {
-  prefs: UserAppPreferences["dashboard"];
-  onChange: (p: UserAppPreferences["dashboard"]) => void;
+interface SecurityPanelProps {
+  prefs: UserAppPreferences;
+  onChange: (p: UserAppPreferences) => void;
 }
 
-const DashboardPanel: React.FC<DashboardPanelProps> = React.memo(
+const SecurityPanel: React.FC<SecurityPanelProps> = React.memo(
   ({ prefs, onChange }) => (
     <PanelRoot>
       <SectionTitle>Behaviour</SectionTitle>
       <Row>
         <RowLabel>
           <RowLabelText>Auto-decrypt dashboard</RowLabelText>
-          <RowLabelSub>Decrypt account data automatically on load</RowLabelSub>
+          <RowLabelSub>
+            Automatically decrypt and display dashboard invoice data when the
+            app opens
+          </RowLabelSub>
         </RowLabel>
         <Toggle
-          value={prefs.autodecrypt ?? false}
-          onChange={(v) => onChange({ ...prefs, autodecrypt: v })}
+          value={prefs.dashboard.autodecrypt ?? false}
+          onChange={(v) =>
+            onChange({
+              ...prefs,
+              dashboard: {
+                ...prefs?.dashboard,
+                autodecrypt: v,
+              },
+            })
+          }
+        />
+      </Row>
+
+      <Row>
+        <RowLabel>
+          <RowLabelText>Auto-decrypt Invoices</RowLabelText>
+          <RowLabelSub>
+            Automatically decrypt invoice contents when opening or viewing
+            invoices
+          </RowLabelSub>
+        </RowLabel>
+        <Toggle
+          value={prefs.invoices.autodecrypt ?? false}
+          onChange={(v) =>
+            onChange({
+              ...prefs,
+              invoices: {
+                ...prefs?.invoices,
+                autodecrypt: v,
+              },
+            })
+          }
         />
       </Row>
     </PanelRoot>
   ),
 );
-DashboardPanel.displayName = "DashboardPanel";
+SecurityPanel.displayName = "SecurityPanel";
 
 // ---------------------------------------------------------------------------
 // Panel: Privacy
@@ -309,14 +341,17 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = React.memo(
     // If the write fails we show a toast but don't roll back — the next
     // modal open will re-hydrate from stateManager anyway.
 
-    const handleDashboardChange = useCallback(
-      async (dashboard: UserAppPreferences["dashboard"]) => {
-        const updated: UserAppPreferences = { ...prefs, dashboard };
+    const handleSecurityChange = useCallback(
+      async (input: UserAppPreferences) => {
+        const updated: UserAppPreferences = {
+          ...prefs,
+          ...input,
+        };
         setPrefs(updated);
         try {
           await majik.stateManager.setUserAppPreferences(updated);
         } catch (err) {
-          console.error("AppSettingsModal: dashboard save failed", err);
+          console.error("AppSettingsModal: security save failed", err);
           toast.error("Failed to save setting.");
         }
       },
@@ -373,13 +408,10 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = React.memo(
       },
       {
         id: "dashboard",
-        label: "Dashboard",
-        icon: GaugeIcon,
+        label: "Security",
+        icon: ShieldCheckIcon,
         content: (
-          <DashboardPanel
-            prefs={prefs.dashboard}
-            onChange={handleDashboardChange}
-          />
+          <SecurityPanel prefs={prefs} onChange={handleSecurityChange} />
         ),
       },
       {

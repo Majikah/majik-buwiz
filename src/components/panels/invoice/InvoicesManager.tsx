@@ -443,7 +443,7 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const list = majik.listInvoices();
+      const list = await majik.listInvoicesByActiveAccount();
       setInvoices(list);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load invoices");
@@ -477,6 +477,10 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
       if (!inv) return null;
       if (inv.isEncrypted && !inv.hasDecryptedCache) {
         try {
+          const autodecrypt = await majik.isAutoDecryptInvoicesEnabled();
+
+          if (!autodecrypt) return inv;
+
           // Unlock / decrypt in-place via the client which emits events
           const unlocked = await majik.unlockInvoice(inv);
           return unlocked;

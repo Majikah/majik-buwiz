@@ -270,7 +270,7 @@ export const DropImportAccount: React.FC<DropImportProps> = ({
         onChange={handleBrowse}
       />
 
-      {hasFile && onPassphraseChange && passphrase && (
+      {hasFile && onPassphraseChange && (
         <CustomInputField
           onChange={(e) => onPassphraseChange(e)}
           maxChar={500}

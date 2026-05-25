@@ -8,6 +8,7 @@ let ready = false;
 const queue: MessageEvent[] = [];
 
 const SCHEMA = MAJIKAH_SQL_SCHEMA_FULL_V_1;
+const PRODUCT_CODE = "majik_buwiz";
 
 async function handleMessage(e: MessageEvent) {
   const { id, type, sql, params } = e.data;
@@ -81,8 +82,8 @@ async function init() {
 
   const openResult = await promiser("open", {
     filename: hasOPFS
-      ? "file:majikah_majik_buwiz.db?vfs=opfs"
-      : "file:majikah_majik_buwiz.db?vfs=memdb",
+      ? `file:majikah_${PRODUCT_CODE}.db?vfs=opfs`
+      : `file:majikah_${PRODUCT_CODE}.db?vfs=memdb`,
   });
 
   dbId = openResult.result.dbId;
