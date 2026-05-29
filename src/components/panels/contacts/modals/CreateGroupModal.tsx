@@ -7,7 +7,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { PlusIcon } from "@phosphor-icons/react";
+import { ListPlusIcon } from "@phosphor-icons/react";
 import styled from "styled-components";
 
 import PopUpFormButton from "@/components/foundations/PopUpFormButton";
@@ -91,7 +91,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = React.memo(
       <PopUpFormButton
         id="button-popup-contacts-create-group"
         scrollable={false}
-        icon={PlusIcon}
+        icon={ListPlusIcon}
         text="New Group"
         modal={{
           title: "Create Group",

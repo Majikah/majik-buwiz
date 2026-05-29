@@ -22,6 +22,7 @@ import {
   ReceiptIcon,
   ShieldCheckIcon,
   PaletteIcon,
+  ScalesIcon,
 } from "@phosphor-icons/react";
 
 import { SettingsTabPanel, type SettingsTab } from "./SettingsTabPanel";
@@ -35,6 +36,8 @@ import { ReduxSystemRootState, toggleTheme } from "@/redux/slices/system";
 import { InvoiceSettings } from "../invoice/InvoiceSettings";
 import DynamicSlidingDialogue from "@/components/functional/DynamicSlidingDialogue";
 import { DEFAULT_USER_APP_PREFERENCES } from "@/SDK/majik-buwiz-client/src/core/client-state-manager";
+import TaxpayerProfileSettings from "../contacts/elements/TaxProfileSettings";
+import { TaxProfileWizardResult } from "../contacts/elements/TaxProfileWizard";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -384,6 +387,27 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = React.memo(
       [prefs, majik],
     );
 
+    const handleTaxProfileChange = useCallback(
+      async (profile: TaxProfileWizardResult) => {
+        try {
+          // 1. Update active account contact meta (bir + taxProfile fields)
+          await majik.updateActiveAccountMeta(profile.contactMetaPatch);
+
+          // 2. Merge computed taxes into existing invoice defaults
+          const existing = await majik.getInvoiceDefaults();
+          await majik.setInvoiceDefaults({
+            ...(existing ?? {}),
+            currency: existing?.currency ?? "PHP",
+            defaultTaxes: profile.taxes,
+          });
+        } catch (err) {
+          console.error("AppSettingsModal: Tax Profile save failed", err);
+          toast.error("Failed to save setting.");
+        }
+      },
+      [prefs, majik],
+    );
+
     const handleClose = useCallback(() => onOpenChange(false), [onOpenChange]);
 
     // ── Tabs ────────────────────────────────────────────────────────────────
@@ -393,6 +417,18 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = React.memo(
         label: "Appearance",
         icon: PaletteIcon,
         content: <AppearancePanel />,
+      },
+      {
+        id: "tax-profile",
+        label: "Tax Profile",
+        icon: ScalesIcon,
+        // InvoiceSettings owns its own load + save lifecycle
+        content: (
+          <TaxpayerProfileSettings
+            majik={majik}
+            onChange={handleTaxProfileChange}
+          />
+        ),
       },
       {
         id: "invoices",

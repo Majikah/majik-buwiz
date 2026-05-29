@@ -60,6 +60,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { InvoiceSettingsModal } from "./modals/InvoiceSettingsModal";
 
 import StyledIconButton from "@/components/foundations/StyledIconButton";
+import { DecryptAndDuplicateModal } from "./modals/DecryptAndDuplicateModal";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -207,6 +208,32 @@ const ModePill = styled.span<{ $mode: ManagerMode }>`
         `;
     }
   }}
+`;
+
+// ── New styled components ─────────────────────────────────────────────────
+
+const OrphanPill = styled.button<{ $active: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: ${({ theme }) => theme.typography.fonts.medium};
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: ${({ theme }) => theme.borders.radius.rounded};
+  border: 1px solid
+    ${({ $active, theme }) =>
+      $active ? theme.colors.primary + "44" : theme.colors.error + "66"};
+  background: ${({ $active, theme }) =>
+    $active ? theme.colors.primarySoft : theme.colors.error + "18"};
+  color: ${({ $active, theme }) =>
+    $active ? theme.colors.primary : theme.colors.error};
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+
+  &:hover {
+    filter: brightness(1.08);
+  }
 `;
 
 const IconButton = styled.button`
@@ -418,6 +445,9 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
     null,
   );
 
+  const [decryptDuplicateTarget, setDecryptDuplicateTarget] =
+    useState<MajikInvoice | null>(null);
+
   // ── Delete dialog ─────────────────────────────────────────────────────────
 
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -439,12 +469,26 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
 
   // ── Load invoices ─────────────────────────────────────────────────────────
 
+  // ── New state ─────────────────────────────────────────────────────────────
+
+  const [orphanCount, setOrphanCount] = useState(0);
+  const [showingOrphans, setShowingOrphans] = useState(false);
+
+  // Ref so loadInvoices always reads the latest value without going stale
+  const showingOrphansRef = useRef(false);
+
   const loadInvoices = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const list = await majik.listInvoicesByActiveAccount();
+      const [list, count] = await Promise.all([
+        showingOrphansRef.current
+          ? majik.getInvoicesNotOwnedByActiveAccount()
+          : majik.listInvoicesByActiveAccount(),
+        majik.countInvoicesNotOwnedByActiveAccount(),
+      ]);
       setInvoices(list);
+      setOrphanCount(count);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load invoices");
     } finally {
@@ -559,6 +603,17 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
     })();
   }, [majik]);
 
+  // ── New toggle handler ────────────────────────────────────────────────────
+
+  const handleToggleOrphans = useCallback(() => {
+    const next = !showingOrphansRef.current;
+    showingOrphansRef.current = next;
+    setShowingOrphans(next);
+    // Reset search/filter state so stale results don't bleed across views
+    setFilteredInvoices([]);
+    loadInvoices();
+  }, [loadInvoices]);
+
   // ── Persist column visibility on change ──────────────────────────────────
 
   const handleColumnVisibilityChange = useCallback(
@@ -656,6 +711,23 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
       console.error("[InvoicesManager] duplicate failed:", err);
     }
   }, []);
+
+  const handleDecryptAndDuplicate = useCallback((inv: MajikInvoice) => {
+    setDecryptDuplicateTarget(inv);
+  }, []);
+
+  const handleDecryptDuplicateSuccess = useCallback(
+    (duplicate: MajikInvoice) => {
+      setDecryptDuplicateTarget(null);
+      // Route into the normal duplicate flow — pre-filled draft, new mode
+      const draft = duplicate.invoice;
+      setDuplicateDraft(draft);
+      setActiveInvoice(null);
+      activeInvoiceRef.current = null;
+      setMode("duplicate");
+    },
+    [],
+  );
 
   const handleBack = useCallback(() => {
     const lockedInvoice = activeInvoice?.secureLock();
@@ -1129,11 +1201,24 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
           <PanelSubtitle id="badge-invoices-count">
             {listSubtitle}
           </PanelSubtitle>
+          {mode === "list" && orphanCount > 0 && (
+            <OrphanPill $active={showingOrphans} onClick={handleToggleOrphans}>
+              {showingOrphans ? (
+                <>× Back to mine</>
+              ) : (
+                <>
+                  {orphanCount} invoice{orphanCount !== 1 ? "s" : ""} from other
+                  accounts
+                </>
+              )}
+            </OrphanPill>
+          )}
         </HeaderLeft>
 
         <HeaderActions>
           {/* ── Quick status transitions (non-list, non-sealed modes) ── */}
           {mode !== "list" &&
+            !showingOrphans &&
             (!activeInvoice?.isSealed ||
               (isAdmin && activeInvoice?.public?.status === "void")) &&
             activeInvoice && (
@@ -1151,6 +1236,7 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
 
           {/* ── Quick mode switching ── */}
           {mode !== "list" &&
+            !showingOrphans &&
             activeInvoice &&
             (activeInvoice.isEncrypted ? (
               <>
@@ -1286,8 +1372,10 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
               onDelete={handleDeleteRequest}
               onBulkDelete={handleBulkDeleteRequest}
               onDuplicate={handleDuplicate}
+              onDecryptAndDuplicate={handleDecryptAndDuplicate}
               onBulkExport={handleExportSelected}
               onSelectionChange={setSelectedInvoicesForExport}
+              isReadOnly={showingOrphans}
             />
           ))}
 
@@ -1406,6 +1494,16 @@ export const InvoicesManager: React.FC<InvoicesManagerProps> = ({
           setModalKey(change ? "invoice-settings" : null)
         }
         open={modalKey === "invoice-settings"}
+      />
+
+      <DecryptAndDuplicateModal
+        open={!!decryptDuplicateTarget}
+        onOpenChange={(open) => {
+          if (!open) setDecryptDuplicateTarget(null);
+        }}
+        invoice={decryptDuplicateTarget}
+        majik={majik}
+        onDuplicated={handleDecryptDuplicateSuccess}
       />
     </Root>
   );

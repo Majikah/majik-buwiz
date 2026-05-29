@@ -1,7 +1,7 @@
-import styled from 'styled-components'
-import { ButtonPrimaryConfirm } from './buttons'
+import styled, { css } from "styled-components";
+import { ButtonPrimaryConfirm } from "./buttons";
 
-import { Drawer } from 'vaul'
+import { Drawer } from "vaul";
 
 // Styled components based on the provided CSS
 export const StyledDialogOverlay = styled(Drawer.Overlay)`
@@ -13,7 +13,7 @@ export const StyledDialogOverlay = styled(Drawer.Overlay)`
   backdrop-filter: blur(5px);
   z-index: ${({ theme }) => theme.zIndex.overlay};
   pointer-events: none;
-`
+`;
 
 export const ScrollContainer = styled.div`
   width: inherit;
@@ -46,7 +46,12 @@ export const ScrollContainer = styled.div`
   }
 
   &::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(0, 0, 0, 0); /* Color when hovering over the scrollbar thumb */
+    background-color: rgba(
+      0,
+      0,
+      0,
+      0
+    ); /* Color when hovering over the scrollbar thumb */
   }
 
   /* Custom Scrollbar for Firefox */
@@ -54,7 +59,7 @@ export const ScrollContainer = styled.div`
   scrollbar-color: ${({ theme }) => theme.colors.primary} rgba(0, 0, 0, 0); /* Thumb and track colors */
 
   position: relative;
-`
+`;
 
 export const StyledDialogContent = styled(Drawer.Content)<{ $width?: number }>`
   background: ${({ theme }) => theme.colors.primaryBackground};
@@ -66,7 +71,7 @@ export const StyledDialogContent = styled(Drawer.Content)<{ $width?: number }>`
 
   position: fixed;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  width: ${({ $width }) => (!!$width && $width > 0 ? `${$width}px` : '500px')};
+  width: ${({ $width }) => (!!$width && $width > 0 ? `${$width}px` : "500px")};
   top: 0;
   right: 0;
   z-index: ${({ theme }) => theme.zIndex.overlay};
@@ -80,17 +85,45 @@ export const StyledDialogContent = styled(Drawer.Content)<{ $width?: number }>`
     margin-left: 0px;
     margin-right: 0px;
   }
-`
+`;
 
-export const StyledDialogTitle = styled(Drawer.Title)`
-  height: 0px;
-  display: none;
-`
+export const StyledDialogTitle = styled(Drawer.Title)<{ $hide?: boolean }>`
+  padding: 0px 3rem;
+  padding-top: 10px;
+  ${({ $hide }) =>
+    $hide
+      ? css`
+          height: 0px;
+          display: none;
+        `
+      : css`
+          height: fit-content;
+          display: block;
+          font-size: 1.5rem;
+          font-weight: 700;
+          color: ${({ theme }) => theme.colors.textPrimary};
+          margin: 0 0 0.5rem 0;
+        `}
+`;
 
-export const StyledDialogDescription = styled(Drawer.Description)`
-  height: 0px;
-  display: none;
-`
+export const StyledDialogDescription = styled(Drawer.Description)<{
+  $hide?: boolean;
+}>`
+  padding: 0px 3rem;
+  ${({ $hide }) =>
+    $hide
+      ? css`
+          height: 0px;
+          display: none;
+        `
+      : css`
+          height: fit-content;
+          display: block;
+          font-size: 0.938rem;
+          color: ${({ theme }) => theme.colors.textSecondary || "#6b7280"};
+          margin: 0;
+        `}
+`;
 
 export const CloseButton = styled(ButtonPrimaryConfirm)`
   width: 100%;
@@ -112,4 +145,4 @@ export const CloseButton = styled(ButtonPrimaryConfirm)`
     color: ${({ theme }) => theme.colors.primaryBackground};
     box-shadow: 0 5px 9px rgba(0, 0, 0, 0.24);
   }
-`
+`;

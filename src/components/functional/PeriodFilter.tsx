@@ -257,7 +257,12 @@ const RETURN_TYPE_OPTIONS: ReturnTypeOption[] = [
 // ---------------------------------------------------------------------------
 
 function toInputDate(d: Date): string {
-  return d.toISOString().slice(0, 16);
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
 }
 
 function fmt(d: Date): string {
@@ -291,11 +296,17 @@ function parseBirPresetKey(
   return { q: Number(m[1]) as BIRQuarter, year: Number(m[2]) };
 }
 
+const FILING_YEAR_OFFSET = 1;
+
+const getMaxAllowedYear = (mode: DateMode) => {
+  const currentYear = new Date().getFullYear();
+  return mode === "filing" ? currentYear + FILING_YEAR_OFFSET : currentYear;
+};
+
 /** Year range for the quarter picker: current year going back 5 years. */
-function buildYearList(): number[] {
-  const now = new Date().getFullYear();
+function buildYearList(maxYear: number): number[] {
   const years: number[] = [];
-  for (let y = now; y >= now - 5; y--) years.push(y);
+  for (let y = maxYear; y >= maxYear - 5; y--) years.push(y);
   return years;
 }
 
@@ -711,6 +722,8 @@ interface QuarterPickerProps {
   birReturnType: BIRReturnType;
   onSelect: (range: DateRange, preset: PresetKey) => void;
   onClose: () => void;
+  viewYear: number;
+  setViewYear: React.Dispatch<React.SetStateAction<number>>;
 }
 
 const QuarterPicker: React.FC<QuarterPickerProps> = ({
@@ -719,11 +732,12 @@ const QuarterPicker: React.FC<QuarterPickerProps> = ({
   birReturnType,
   onSelect,
   onClose,
+  viewYear,
+  setViewYear,
 }) => {
-  const yearList = buildYearList();
+  const maxYear = getMaxAllowedYear(dateMode);
+  const yearList = buildYearList(maxYear);
   const minYear = yearList[yearList.length - 1];
-  const maxYear = yearList[0];
-  const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
 
   const handleQ = useCallback(
     (q: BIRQuarter) => {
@@ -739,6 +753,14 @@ const QuarterPicker: React.FC<QuarterPickerProps> = ({
   );
 
   const activeQ = parseBirPresetKey(activePreset);
+  const annualOnly = dateMode === "filing" && birReturnType === "income_annual";
+
+  const handleYearSelect = useCallback(() => {
+    const from = new Date(viewYear, 0, 1, 0, 0, 0, 0);
+    const to = new Date(viewYear, 11, 31, 23, 59, 59, 999);
+    onSelect({ from, to }, "annual");
+    onClose();
+  }, [viewYear, onSelect, onClose]);
 
   return (
     <QuarterPickerWrap>
@@ -760,35 +782,61 @@ const QuarterPicker: React.FC<QuarterPickerProps> = ({
         </YearNavBtn>
       </YearNav>
 
-      <QuarterGrid>
-        {([1, 2, 3, 4] as BIRQuarter[]).map((q) => {
-          const period = BIRTaxPeriod.fromQuarter(q, viewYear);
-          const range =
-            dateMode === "filing"
-              ? period.filingRange(birReturnType)
-              : period.range;
-          const deadline = period.getDeadline(birReturnType);
-          const isActive = activeQ?.q === q && activeQ?.year === viewYear;
-          const isFuture = range.from > new Date();
+      {annualOnly ? (
+        <QuarterGrid>
+          {(() => {
+            const isFutureYear = viewYear > new Date().getFullYear();
+            const from = new Date(viewYear, 0, 1);
+            const to = new Date(viewYear, 11, 31, 23, 59, 59, 999);
+            return (
+              <QuarterBtn
+                key={`year-${viewYear}`}
+                $active={false}
+                $disabled={dateMode !== "filing" ? isFutureYear : false}
+                disabled={dateMode !== "filing" ? isFutureYear : false}
+                onClick={handleYearSelect}
+                title={`Select ${viewYear} (Jan 1 – Dec 31)`}
+              >
+                Year {viewYear}
+                <QuarterBtnSub>
+                  {fmt(from).replace(`, ${viewYear}`, "")} –{" "}
+                  {fmt(to).replace(`, ${viewYear}`, "")}
+                </QuarterBtnSub>
+              </QuarterBtn>
+            );
+          })()}
+        </QuarterGrid>
+      ) : (
+        <QuarterGrid>
+          {([1, 2, 3, 4] as BIRQuarter[]).map((q) => {
+            const period = BIRTaxPeriod.fromQuarter(q, viewYear);
+            const range =
+              dateMode === "filing"
+                ? period.filingRange(birReturnType)
+                : period.range;
+            const deadline = period.getDeadline(birReturnType);
+            const isActive = activeQ?.q === q && activeQ?.year === viewYear;
+            const isFuture = range.from > new Date();
 
-          return (
-            <QuarterBtn
-              key={q}
-              $active={isActive}
-              $disabled={isFuture}
-              disabled={isFuture}
-              onClick={() => handleQ(q)}
-              title={`Deadline: ${deadline.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}`}
-            >
-              Q{q}
-              <QuarterBtnSub>
-                {fmt(range.from).replace(`, ${viewYear}`, "")} –{" "}
-                {fmt(range.to).replace(`, ${viewYear}`, "")}
-              </QuarterBtnSub>
-            </QuarterBtn>
-          );
-        })}
-      </QuarterGrid>
+            return (
+              <QuarterBtn
+                key={q}
+                $active={isActive}
+                $disabled={isFuture}
+                disabled={isFuture}
+                onClick={() => handleQ(q)}
+                title={`Deadline: ${deadline.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}`}
+              >
+                Q{q}
+                <QuarterBtnSub>
+                  {fmt(range.from).replace(`, ${viewYear}`, "")} –{" "}
+                  {fmt(range.to).replace(`, ${viewYear}`, "")}
+                </QuarterBtnSub>
+              </QuarterBtn>
+            );
+          })}
+        </QuarterGrid>
+      )}
     </QuarterPickerWrap>
   );
 };
@@ -812,6 +860,10 @@ export const PeriodFilter: React.FC<PeriodFilterProps> = ({
   const [customFrom, setCustomFrom] = useState(toInputDate(value.from));
   const [customTo, setCustomTo] = useState(toInputDate(value.to));
   const anchorRef = useRef<HTMLDivElement>(null);
+
+  const [viewYear, setViewYear] = useState(() =>
+    Math.min(new Date().getFullYear(), getMaxAllowedYear(dateMode)),
+  );
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -845,12 +897,17 @@ export const PeriodFilter: React.FC<PeriodFilterProps> = ({
   const handleModeToggle = useCallback(
     (mode: DateMode) => {
       onDateModeChange?.(mode);
-      // If switching to filing and a quarter is already selected, re-resolve range
+
+      const maxYear = getMaxAllowedYear(mode);
+
+      setViewYear((y) => Math.min(y, maxYear));
+
       const parsed = parseBirPresetKey(activePreset);
       if (parsed) {
         const period = BIRTaxPeriod.fromQuarter(parsed.q, parsed.year);
         const range =
           mode === "filing" ? period.filingRange(birReturnType) : period.range;
+
         onChange(range, activePreset);
       }
     },
@@ -893,6 +950,9 @@ export const PeriodFilter: React.FC<PeriodFilterProps> = ({
   const activeReturnTypeOption = RETURN_TYPE_OPTIONS.find(
     (o) => o.value === birReturnType,
   );
+
+  const isAnnualFiling =
+    dateMode === "filing" && birReturnType === "income_annual";
 
   return (
     <Wrapper>
@@ -968,12 +1028,18 @@ export const PeriodFilter: React.FC<PeriodFilterProps> = ({
             onClick={() =>
               setOpenView((v) => (v === "quarter" ? "none" : "quarter"))
             }
-            title="Select a specific BIR quarter"
+            title={
+              isAnnualFiling
+                ? "Select Tax Year"
+                : "Select a specific BIR quarter"
+            }
           >
             <SealCheckIcon size={12} />
-            {isQuarterActive
-              ? `Q${activeBirParsed!.q} ${activeBirParsed!.year}`
-              : "Quarter"}
+            {isAnnualFiling
+              ? `Year ${value.from.getFullYear()}`
+              : isQuarterActive
+                ? `Q${activeBirParsed!.q} ${activeBirParsed!.year}`
+                : "Quarter"}
             <CaretDownIcon size={10} />
           </CustomButton>
 
@@ -1018,6 +1084,8 @@ export const PeriodFilter: React.FC<PeriodFilterProps> = ({
                 birReturnType={birReturnType}
                 onSelect={onChange}
                 onClose={() => setOpenView("none")}
+                setViewYear={setViewYear}
+                viewYear={viewYear}
               />
             </DropSection>
 

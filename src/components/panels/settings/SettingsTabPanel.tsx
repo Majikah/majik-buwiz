@@ -61,7 +61,7 @@ const Root = styled.div<{ $position: SettingsPanelPosition }>`
 const NavList = styled.nav<{ $position: SettingsPanelPosition }>`
   display: flex;
   flex-shrink: 0;
-  background-color: ${({ theme }) => theme.colors.secondaryBackground};
+
 
   ${({ $position }) =>
     $position === "left"
@@ -116,12 +116,12 @@ const NavButton = styled.button<{
           border-left: 3px solid
             ${$active ? theme.colors.primary : "transparent"};
           background-color: ${$active
-            ? theme.colors.primaryBackground
+            ? theme.colors.secondaryBackground
             : "transparent"};
 
           &:hover {
-            background-color: ${theme.colors.primaryBackground};
-            color: ${theme.colors.primary};
+            background: ${theme.colors.primarySoft};
+            color: ${theme.colors.textPrimary};
           }
 
           @media (max-width: 600px) {

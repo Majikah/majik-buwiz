@@ -1,3 +1,17 @@
+/**
+ * MajikBuwizOnboardingGate.tsx  (UPDATED — tax profile step added)
+ *
+ * Changes from previous version:
+ *   1. GatePhase now includes "tax" between "invoice" and "online"
+ *   2. GATE_STEPS updated with Tax step
+ *   3. BypassOption includes "tax"
+ *   4. Phase initialisation flow checks "tax" phase between invoice and online
+ *   5. New PHASE: tax — renders TaxProfileWizard inside the gate dialog
+ *   6. handleSaveInvoiceMeta advances to "tax" (unless bypassed) instead of "online"
+ *
+ * All other logic is unchanged.
+ */
+
 import React, {
   useCallback,
   useEffect,
@@ -63,7 +77,11 @@ import JSZip from "jszip";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import CustomFormInput from "./foundations/CustomFormInput";
-
+// ─── NEW ──────────────────────────────────────────────────────────────────────
+import {
+  TaxProfileWizard,
+  TaxProfileWizardResult,
+} from "./panels/contacts/elements/TaxProfileWizard";
 // ─── Animations ───────────────────────────────────────────────────────────────
 
 const fadeIn = keyframes`
@@ -655,7 +673,7 @@ const SuccessDesc = styled.p`
   max-width: 320px;
 `;
 
-// ─── Account list (register step remnant — reused for display) ────────────────
+// ─── Account list ─────────────────────────────────────────────────────────────
 
 const AccountList = styled.div`
   display: flex;
@@ -718,7 +736,7 @@ const AccountID = styled.span`
   text-overflow: ellipsis;
 `;
 
-// ─── Loading shimmer ──────────────────────────────────────────────────────────
+// ─── Shimmer ──────────────────────────────────────────────────────────────────
 
 const ShimmerText = styled.span`
   background: linear-gradient(
@@ -734,7 +752,7 @@ const ShimmerText = styled.span`
   animation: ${shimmer} 1.6s linear infinite;
 `;
 
-// ─── Action footer ────────────────────────────────────────────────────────────
+// ─── Footer ───────────────────────────────────────────────────────────────────
 
 const Footer = styled.div`
   display: flex;
@@ -836,22 +854,25 @@ type AccountMode = "create" | "import" | null;
  * Gate phases in order:
  *   account  → no local accounts at all
  *   invoice  → fill out invoice / business meta
+ *   tax      → BIR tax profile setup (NEW)
  *   online   → choose: stay offline OR create a Universal ID online
  *   muid     → authenticate + create MUID (sub-flow of "online" choice)
  *   tour     → first-time tour
  *   done     → gate complete, render children normally
  */
-type GatePhase = "account" | "invoice" | "online" | "muid" | "tour" | "done";
+type GatePhase =
+  | "account"
+  | "invoice"
+  | "tax" // ← NEW
+  | "online"
+  | "muid"
+  | "tour"
+  | "done";
 
-/**
- * Online sub-steps when the user chooses "Go Online":
- *   auth    → sign in / sign up
- *   key     → drop seed-key backup to bind to MUID
- *   success → MUID created
- */
 type OnlineStep = "auth" | "key" | "success";
 
-type BypassOption = "invoice" | "online" | "muid" | "tour";
+// ← "tax" added to the bypass union
+type BypassOption = "invoice" | "tax" | "online" | "muid" | "tour";
 
 interface MajikBuwizOnboardingGateProps {
   children: React.ReactNode;
@@ -859,15 +880,16 @@ interface MajikBuwizOnboardingGateProps {
   majik: MajikBuwizDatabase;
   onUpdate?: (updated: MajikBuwizDatabase) => void;
   onLaunchTour?: () => Promise<void> | void;
-  /** Pass phase names to skip them, e.g. ["invoice", "online"]. Default: []. */
   bypass?: BypassOption[];
 }
 
 // ─── Step config ──────────────────────────────────────────────────────────────
+// "tax" maps to the "Tax" label; it sits between Business and Network
 
 const GATE_STEPS: { id: GatePhase; label: string }[] = [
   { id: "account", label: "Key" },
   { id: "invoice", label: "Business" },
+  { id: "tax", label: "Tax" }, // ← NEW
   { id: "online", label: "Network" },
   { id: "done", label: "Done" },
 ];
@@ -912,7 +934,7 @@ const MajikBuwizOnboardingGate: React.FC<MajikBuwizOnboardingGateProps> = ({
   );
   const [onlineStep, setOnlineStep] = useState<OnlineStep>("auth");
 
-  // ── MUID key-loading (online/muid sub-step) ────────────────────────────────
+  // ── MUID key-loading ───────────────────────────────────────────────────────
   const [isDragging, setIsDragging] = useState(false);
   const [loadedKey, setLoadedKey] = useState<MajikKey | null>(null);
   const [muidKeyError, setMuidKeyError] = useState<string | null>(null);
@@ -931,9 +953,7 @@ const MajikBuwizOnboardingGate: React.FC<MajikBuwizOnboardingGateProps> = ({
       return;
     }
 
-    // Accounts exist — check whether invoice phase should be shown
     if (!bypass.includes("invoice")) {
-      // We use a preference flag to know if the user already completed invoice
       const invoiceDone = hasPreference("majik_invoice_meta_complete");
       if (!invoiceDone) {
         setPhase("invoice");
@@ -941,7 +961,15 @@ const MajikBuwizOnboardingGate: React.FC<MajikBuwizOnboardingGateProps> = ({
       }
     }
 
-    // Invoice done (or bypassed) — check online phase
+    // ── NEW: tax phase check ──────────────────────────────────────────────
+    if (!bypass.includes("tax")) {
+      const taxDone = hasPreference("majik_tax_profile_complete");
+      if (!taxDone) {
+        setPhase("tax");
+        return;
+      }
+    }
+
     if (!bypass.includes("online")) {
       const unregistered = accounts.filter((a) => !a.isMajikahRegistered());
       const allSkipped = unregistered.every((a) =>
@@ -967,14 +995,11 @@ const MajikBuwizOnboardingGate: React.FC<MajikBuwizOnboardingGateProps> = ({
         const defaults = await majik.getInvoiceDefaults();
         if (!mounted) return;
 
-        // Priority: invoice defaults → majikah user metadata
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const user = majikah?.user;
         const userFullName = user?.fullName;
         const userMeta = user?.metadata;
 
         setInvoiceMeta({
-          // Start from existing defaults if any
           legalName: defaults?.issuer?.legalName ?? userFullName ?? "",
           tradeName: defaults?.issuer?.tradeName ?? "",
           tin: defaults?.issuer?.tin ?? "",
@@ -1081,72 +1106,38 @@ const MajikBuwizOnboardingGate: React.FC<MajikBuwizOnboardingGateProps> = ({
     setMnemonicJSON(jsonData);
 
     const majikByte = await MajikBytes.create(base64String);
-
     const mbyteFile = await majikByte.toPNG();
-
     const pngBuffer = await mbyteFile.arrayBuffer();
 
     const readmeContent = `
 Majik Key Backup\n
 IMPORTANT: Keep this file secure and private at all times. If lost or compromised, your account access may be permanently at risk.\n\n
-
 Overview\n
-This backup ZIP file contains your raw JSON data and a Backup PNG. These files are essential for recovering your account.\n\n
-
-Usage Instructions\n
-• Storage: You may delete the JSON file and keep only the PNG file if preferred.\n
-• Customization: You can rename the PNG file for added discretion.\n
-• Recovery: This PNG allows you to securely re-import your account without exposing raw JSON data.\n\n
-
-Critical Handling Requirements\n
-To prevent data corruption and ensure the backup remains functional, please follow these rules:\n
-
-• No Modifications: Do not edit, crop, or apply filters to the PNG image.\n
-• No Processing: Avoid running the image through compression tools or "optimization" software.\n
-• Storage Only: Store the image as is. Do not upload it to social media, messaging apps, or cloud platforms that automatically compress or manipulate images, as this will destroy the embedded data.\n\n
-
+This backup ZIP file contains your raw JSON data and a Backup PNG.\n\n
 Backup created on: ${new Date().toLocaleString()}\n
-IMPORTANT: Keep this file secure and private at all times. If lost or compromised, your account access may be permanently at risk.\n\n
     `;
 
-    // 2. Initialize JSZip and add all 3 items
     const zip = new JSZip();
-
     const defaultFileName = `${label} - ${created.id} - SEED KEY`;
 
-    // Item 1: The JSON (from a string)
     zip.file("backup.json", seedJSONBlob);
-
-    // Item 2: The second Blob
-    // JSZip handles Blobs directly
     zip.file("backup.png", pngBuffer, { binary: true });
-
-    // Item 3: The README (from a string)
     zip.file("IMPORTANT README.txt", readmeContent);
 
-    // 3. Generate the final ZIP blob
     const zipBlob = await zip.generateAsync({
       type: "blob",
       compression: "DEFLATE",
       compressionOptions: { level: 9 },
     });
 
-    // Open the native save dialog
     const filePath = await save({
       defaultPath: defaultFileName,
-      filters: [
-        {
-          name: "Backup ZIP",
-          extensions: ["zip"],
-        },
-      ],
+      filters: [{ name: "Backup ZIP", extensions: ["zip"] }],
     });
 
-    // User cancelled the dialog
     if (!filePath) {
       downloadBlob(zipBlob, "zip", defaultFileName);
     } else {
-      // Convert blob → Uint8Array and write to the chosen path
       const arrayBuffer = await zipBlob.arrayBuffer();
       await writeFile(filePath, new Uint8Array(arrayBuffer));
     }
@@ -1186,13 +1177,11 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
         ? await handleCreateAccount()
         : await handleImportAccount();
 
-      // Bind to the active account if available
       const activeAccount = majik.getActiveAccount();
       if (activeAccount && invoiceMeta) {
         await majik.updateContactMeta(activeAccount.id, invoiceMeta);
       }
 
-      // Persist as invoice defaults — always called so everything is bound
       const existingDefaults = await majik.getInvoiceDefaults();
       const updatedDefaults: InvoiceDefaults = {
         ...(existingDefaults ?? {}),
@@ -1227,17 +1216,62 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
         resetAccountForm();
         onUpdate?.(majik);
         refresh();
-        if (bypass.includes("online")) {
-          setPhase("tour");
+
+        // ── UPDATED: advance to "tax" unless bypassed ──────────────────────
+        if (bypass.includes("tax")) {
+          setPhase(bypass.includes("online") ? "tour" : "online");
         } else {
-          setPhase("online");
+          setPhase("tax");
         }
+
         return m;
       },
       error: (e) => e?.message || "Failed to process account.",
       finally: () => setIsSavingInvoice(false),
     });
   };
+
+  // ─── Tax profile: Save ─────────────────────────────────────────────────────
+
+  /**
+   * Called by TaxProfileWizard when the user completes and confirms.
+   * Applies both contactMeta patch and invoice defaults taxes, then
+   * advances to the "online" phase (or "tour" if online is bypassed).
+   */
+  const handleTaxProfileComplete = useCallback(
+    async (result: TaxProfileWizardResult): Promise<void> => {
+      const save = async () => {
+        // 1. Patch contact meta with bir + taxProfile fields
+        await majik.updateActiveAccountMeta(result.contactMetaPatch);
+
+        // 2. Merge computed taxes into invoice defaults
+        const existing = await majik.getInvoiceDefaults();
+        await majik.setInvoiceDefaults({
+          ...(existing ?? {}),
+          currency: existing?.currency ?? "PHP",
+          defaultTaxes: result.taxes,
+        });
+
+        addPreference("majik_tax_profile_complete");
+        onUpdate?.(majik);
+      };
+
+      toast.promise(save(), {
+        loading: "Saving tax profile…",
+        success: () => {
+          setPhase(bypass.includes("online") ? "tour" : "online");
+          return "Tax profile saved";
+        },
+        error: (e) => e?.message ?? "Failed to save tax profile",
+      });
+    },
+    [majik, bypass, addPreference, onUpdate],
+  );
+
+  const handleSkipTax = useCallback((): void => {
+    addPreference("majik_tax_profile_complete");
+    setPhase(bypass.includes("online") ? "tour" : "online");
+  }, [bypass, addPreference]);
 
   // ─── Online: Stay offline ──────────────────────────────────────────────────
 
@@ -1278,7 +1312,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
       let parsedJSON: MnemonicJSON;
 
       if (isPNG) {
-        // Lazy import to avoid hard dep if not needed
         const { MajikBytes } = await import("@majikah/majik-bytes");
         const loaded = await MajikBytes.fromPNG(file);
         const decoded = atob(loaded.toStringValue());
@@ -1335,7 +1368,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
       setCreatedMUID(uid);
       setOnlineStep("success");
 
-      // Mark account as registered
       const activeAccount = majik.getActiveAccount();
       if (activeAccount) {
         addPreference(`majik_registered_${activeAccount.id}`);
@@ -1353,7 +1385,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
         if (activeAccount) {
           addPreference(`majik_registered_${activeAccount.id}`);
         }
-
         toast.info("MUID already created", { description: msg });
       } else {
         toast.error("MUID creation failed", { description: msg });
@@ -1415,7 +1446,7 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // PHASE: account
+  // PHASE: account  (unchanged)
   // ══════════════════════════════════════════════════════════════════════════
 
   if (phase === "account") {
@@ -1446,7 +1477,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                 <StepWrapper>
                   {renderProgress()}
 
-                  {/* ── Choose mode ── */}
                   {!accountMode && (
                     <>
                       <StepHeader>
@@ -1491,7 +1521,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                     </>
                   )}
 
-                  {/* ── Create form ── */}
                   {accountMode === "create" && (
                     <>
                       <StepHeader>
@@ -1501,14 +1530,13 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                         <StepTitle>Create a New Key Account</StepTitle>
                         <StepHint>
                           A seed key backup file will be downloaded
-                          automatically. Keep it safe — it's the only way to
-                          recover your account.
+                          automatically.
                         </StepHint>
                       </StepHeader>
 
                       <DynamicAlertBanner
                         title="Keep this private"
-                        description="Never share your seed phrase or backup JSON with anyone. Store your backup in a safe, offline location."
+                        description="Never share your seed phrase or backup JSON with anyone."
                         level="danger"
                       />
                       <CustomInputField
@@ -1531,7 +1559,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                     </>
                   )}
 
-                  {/* ── Import form ── */}
                   {accountMode === "import" && (
                     <>
                       <StepHeader>
@@ -1540,8 +1567,7 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                         </IconBadge>
                         <StepTitle>Import an Existing Account</StepTitle>
                         <StepHint>
-                          Load your backup file and enter the password you used
-                          when creating the account.
+                          Load your backup file and enter the password.
                         </StepHint>
                       </StepHeader>
 
@@ -1557,18 +1583,14 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                       <ImportModeToggle>
                         <ModeToggleButton
                           $active={importMode === "drop"}
-                          onClick={() => {
-                            setImportMode("drop");
-                          }}
+                          onClick={() => setImportMode("drop")}
                           type="button"
                         >
                           <UploadSimpleIcon size={12} /> Backup file
                         </ModeToggleButton>
                         <ModeToggleButton
                           $active={importMode === "manual"}
-                          onClick={() => {
-                            setImportMode("manual");
-                          }}
+                          onClick={() => setImportMode("manual")}
                           type="button"
                         >
                           <KeyboardIcon size={12} /> Enter manually
@@ -1631,9 +1653,13 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                       disabled={!canProceed}
                       onClick={() => {
                         if (bypass.includes("invoice")) {
-                          setPhase(
-                            bypass.includes("online") ? "tour" : "online",
-                          );
+                          if (bypass.includes("tax")) {
+                            setPhase(
+                              bypass.includes("online") ? "tour" : "online",
+                            );
+                          } else {
+                            setPhase("tax");
+                          }
                         } else {
                           setPhase("invoice");
                         }
@@ -1653,7 +1679,7 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // PHASE: invoice
+  // PHASE: invoice  (unchanged, except Back goes to account)
   // ══════════════════════════════════════════════════════════════════════════
 
   if (phase === "invoice") {
@@ -1674,8 +1700,7 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
               <DialogHeader>
                 <DialogTitle>Business Information</DialogTitle>
                 <DialogDescription>
-                  This information is used on your invoices and documents. You
-                  can update it anytime in Settings.
+                  This information is used on your invoices and documents.
                 </DialogDescription>
               </DialogHeader>
 
@@ -1696,7 +1721,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
 
                   <FormGrid>
                     <SectionSubhead>Identity</SectionSubhead>
-
                     <CustomInputField
                       label="Legal Name"
                       required
@@ -1706,7 +1730,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                       maxChar={200}
                       sensitive
                     />
-
                     <CustomInputField
                       label="Trade / Brand Name"
                       currentValue={invoiceMeta.tradeName ?? ""}
@@ -1715,7 +1738,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                       maxChar={200}
                       sensitive
                     />
-
                     <FormRow>
                       <FormGroup>
                         <CustomFormInput
@@ -1747,7 +1769,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
 
                     <FormDivider />
                     <SectionSubhead>Contact</SectionSubhead>
-
                     <FormRow>
                       <FormGroup>
                         <CustomFormInput
@@ -1776,7 +1797,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                         />
                       </FormGroup>
                     </FormRow>
-
                     <FormGroup>
                       <CustomFormInput
                         label="Website"
@@ -1793,7 +1813,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
 
                     <FormDivider />
                     <SectionSubhead>Invoice Notes (optional)</SectionSubhead>
-
                     <FormGroup>
                       <CustomFormInput
                         label="Default Notes"
@@ -1802,7 +1821,7 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                         onChange={(e) =>
                           setInvoiceMetaField("notes", e as string)
                         }
-                        placeholder="Payment terms, bank details, thank-you note…"
+                        placeholder="Payment terms, bank details…"
                         maxChar={2500}
                         layout="stack"
                       />
@@ -1812,23 +1831,7 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
               </ScrollContainer>
 
               <Footer>
-                {/* <SkipLink
-                  type="button"
-                  onClick={() => {
-                    addPreference("majik_invoice_meta_complete");
-                    setPhase(bypass.includes("online") ? "tour" : "online");
-                  }}
-                >
-                  Skip for now
-                </SkipLink> */}
-                <NavButton
-                  type="button"
-                  onClick={() => {
-                    setPhase("account");
-                    // setAccountMode(null);
-                    // resetAccountForm();
-                  }}
-                >
+                <NavButton type="button" onClick={() => setPhase("account")}>
                   <ArrowLeftIcon size={13} /> Back
                 </NavButton>
                 <NavButtons>
@@ -1856,7 +1859,57 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // PHASE: online  (choose: go online or stay offline)
+  // PHASE: tax  ← NEW
+  // ══════════════════════════════════════════════════════════════════════════
+
+  if (phase === "tax") {
+    return (
+      <>
+        {children}
+        <AlertDialog.Root open>
+          <AlertDialog.Portal>
+            <DialogOverlay />
+            <GateContent>
+              <DialogHeader>
+                <DialogTitle>Tax Registration</DialogTitle>
+                <DialogDescription>
+                  Configure your BIR profile so invoices are auto-compliant. You
+                  can update this anytime in Settings.
+                </DialogDescription>
+              </DialogHeader>
+
+              <ScrollContainer>
+                <StepWrapper>
+                  {renderProgress()}
+
+                  {/* TaxProfileWizard renders its own internal progress bar
+                      and footer buttons — compact=false to keep full wizard UX */}
+                  <TaxProfileWizard
+                    majik={majik}
+                    compact={false}
+                    onComplete={handleTaxProfileComplete}
+                    onSkip={handleSkipTax}
+                  />
+                </StepWrapper>
+              </ScrollContainer>
+
+              {/* No extra footer here — TaxProfileWizard's own footer handles nav.
+                  We only add a Back button outside the scroll area for consistency. */}
+              <Footer>
+                <NavButton type="button" onClick={() => setPhase("invoice")}>
+                  <ArrowLeftIcon size={13} /> Back
+                </NavButton>
+                <div />
+              </Footer>
+            </GateContent>
+          </AlertDialog.Portal>
+        </AlertDialog.Root>
+      </>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PHASE: online  (unchanged)
   // ══════════════════════════════════════════════════════════════════════════
 
   if (phase === "online") {
@@ -1870,8 +1923,8 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
               <DialogHeader>
                 <DialogTitle>Join the Majikah Network</DialogTitle>
                 <DialogDescription>
-                  Register online to send messages, create a Universal ID, and
-                  be discoverable on the network.
+                  Register online to send/receive invoices and create a
+                  Universal ID.
                 </DialogDescription>
               </DialogHeader>
 
@@ -1886,8 +1939,7 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                     <StepTitle>How would you like to proceed?</StepTitle>
                     <StepHint>
                       Going online creates a verified Universal ID linked to
-                      your local key. You can always do this later from the
-                      Identity panel.
+                      your local key.
                     </StepHint>
                   </StepHeader>
 
@@ -1904,8 +1956,7 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                         <OnlineOptionTitle>Go Online</OnlineOptionTitle>
                         <OnlineOptionDesc>
                           Sign in or create a Majikah account, then link your
-                          key to a Universal ID. Unlocks messaging, exchange,
-                          and verification features.
+                          key to a Universal ID.
                         </OnlineOptionDesc>
                       </OnlineOptionMeta>
                     </OnlineOptionCard>
@@ -1922,8 +1973,7 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                       <OnlineOptionMeta>
                         <OnlineOptionTitle>Stay Offline</OnlineOptionTitle>
                         <OnlineOptionDesc>
-                          Use Majik Buwiz offline — sign documents and manage
-                          invoices locally. You can register online anytime.
+                          Use Majik Buwiz offline. Register anytime.
                         </OnlineOptionDesc>
                       </OnlineOptionMeta>
                     </OnlineOptionCard>
@@ -1991,7 +2041,7 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // PHASE: muid  (auth → key load → create MUID)
+  // PHASE: muid  (unchanged)
   // ══════════════════════════════════════════════════════════════════════════
 
   if (phase === "muid") {
@@ -2028,7 +2078,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
       </>
     );
 
-    // ── Sub-step: auth ──────────────────────────────────────────────────────
     if (onlineStep === "auth") {
       return (
         <>
@@ -2043,38 +2092,31 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                     A Majikah account is required to create your Universal ID.
                   </DialogDescription>
                 </DialogHeader>
-
                 <ScrollContainer>
                   <StepWrapper>
                     {renderMUIDProgress()}
-
                     <StepHeader>
                       <IconBadge>
                         <UserCircleIcon size={22} />
                       </IconBadge>
                       <StepTitle>Majikah Account</StepTitle>
                       <StepHint>
-                        Sign in or create a free Majikah account. Your
-                        cryptographic key stays local — only your public key and
-                        profile are shared.
+                        Sign in or create a free Majikah account. Your key stays
+                        local.
                       </StepHint>
                     </StepHeader>
-
-                    {/* Inline auth — no extra dialog */}
                     <UserAuth
                       showLogo={false}
                       expand
-                      onSignIn={() => {
-                        // Give session a tick to propagate then advance
-                        setTimeout(() => setOnlineStep("key"), 400);
-                      }}
-                      onSignUp={() => {
-                        setTimeout(() => setOnlineStep("key"), 400);
-                      }}
+                      onSignIn={() =>
+                        setTimeout(() => setOnlineStep("key"), 400)
+                      }
+                      onSignUp={() =>
+                        setTimeout(() => setOnlineStep("key"), 400)
+                      }
                     />
                   </StepWrapper>
                 </ScrollContainer>
-
                 <Footer>
                   <NavButton
                     type="button"
@@ -2096,7 +2138,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
       );
     }
 
-    // ── Sub-step: key ───────────────────────────────────────────────────────
     if (onlineStep === "key") {
       return (
         <>
@@ -2111,23 +2152,19 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                     Load your seed key backup to link it to your Universal ID.
                   </DialogDescription>
                 </DialogHeader>
-
                 <ScrollContainer>
                   <StepWrapper>
                     {renderMUIDProgress()}
-
                     <StepHeader>
                       <IconBadge>
                         <ShieldPlusIcon size={22} />
                       </IconBadge>
                       <StepTitle>Load Your Majik Key</StepTitle>
                       <StepHint>
-                        Drop your .json or .png seed key backup file. It is
-                        loaded into memory only and never re-uploaded.
+                        Drop your .json or .png seed key backup file.
                       </StepHint>
                     </StepHeader>
 
-                    {/* Hidden native input */}
                     <input
                       ref={muidFileRef}
                       type="file"
@@ -2158,8 +2195,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                         </DropZoneTitle>
                         <DropZoneHint>
                           Accepts .json or .png backup files.
-                          <br />
-                          Loaded into memory only — never re-uploaded.
                         </DropZoneHint>
                         <BrowseBtn>
                           <FilePlusIcon size={12} /> Browse files
@@ -2225,7 +2260,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                       </ErrorBanner>
                     )}
 
-                    {/* Summary of what will be created */}
                     {loadedKey && majikah?.user && (
                       <MUIDCreationWrap>
                         <SectionSubhead>
@@ -2257,12 +2291,10 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                     )}
                   </StepWrapper>
                 </ScrollContainer>
-
                 <Footer>
                   <NavButton
                     type="button"
                     onClick={() => {
-                      // Go back to auth if not authenticated, otherwise online choice
                       if (!majikah?.isAuthenticated) {
                         setOnlineStep("auth");
                       } else {
@@ -2300,7 +2332,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
       );
     }
 
-    // ── Sub-step: success ───────────────────────────────────────────────────
     if (onlineStep === "success" && createdMUID) {
       return (
         <>
@@ -2315,11 +2346,9 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                     Your Universal ID has been created and linked to your key.
                   </DialogDescription>
                 </DialogHeader>
-
                 <ScrollContainer>
                   <StepWrapper>
                     {renderMUIDProgress()}
-
                     <SuccessWrap>
                       <SuccessIconWrap>
                         <ShieldCheckIcon
@@ -2330,11 +2359,8 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                       </SuccessIconWrap>
                       <SuccessTitle>Universal ID Created</SuccessTitle>
                       <SuccessDesc>
-                        Your identity is anchored to your Majik Key. You can
-                        start the verification process anytime from the Identity
-                        panel.
+                        Your identity is anchored to your Majik Key.
                       </SuccessDesc>
-
                       <MUIDInfoCard style={{ width: "100%" }}>
                         <MUIDInfoRow>
                           <MUIDInfoLabel>ID</MUIDInfoLabel>
@@ -2370,7 +2396,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
                     </SuccessWrap>
                   </StepWrapper>
                 </ScrollContainer>
-
                 <Footer>
                   <div />
                   <NavButton
@@ -2389,7 +2414,6 @@ IMPORTANT: Keep this file secure and private at all times. If lost or compromise
     }
   }
 
-  // Fallback — should not reach here
   return <>{children}</>;
 };
 

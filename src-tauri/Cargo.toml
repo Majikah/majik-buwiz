@@ -1,8 +1,8 @@
 [package]
 name = "majik-buwiz-desktop"
-version = "0.1.4"
+version = "0.1.5"
 description = "Post-Quantum Invoice Management for modern businesses — secure, offline-first, and just like magic."
-authors = ["Majik Information Technology Solutions"]
+authors = ["Majikah Solutions OPC"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

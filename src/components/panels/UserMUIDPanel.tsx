@@ -43,6 +43,7 @@ import {
   DownloadIcon,
   IdentificationCardIcon,
   PencilIcon,
+  ScalesIcon,
   ShareIcon,
   SignInIcon,
   SignOutIcon,
@@ -82,6 +83,13 @@ import {
 
 import { IconBtn, SpinIcon, REVOKE_LOCKOUT_MS } from "./shared/atoms";
 import { EditContactMetaModal } from "./contacts/modals";
+import { MajikahAuthModal } from "./muid/modals/MajikahAuthModal";
+
+import {
+  API_RESPONSE_SIGN_IN,
+  API_RESPONSE_SIGN_UP,
+} from "../majikah-session-wrapper/api-types";
+import { TaxProfileSettingsModal } from "./contacts/modals/TaxProfileSettingsModal";
 
 // ─── Layout atoms local to this file ──────────────────────────────────────────
 
@@ -287,6 +295,8 @@ const UserMUIDPanel: React.FC<UserMUIDPanelProps> = ({
   const [showDecryptModal, setShowDecryptModal] = useState(false);
   const [showReplaceKeyModal, setShowReplaceKeyModal] = useState(false);
   const [showEditMetaModal, setShowEditMetaModal] = useState(false);
+  const [showTaxProfileWizardModal, setShowTaxProfileWizardModal] =
+    useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
 
   // EditMeta needs a snapshot of the account meta at the time of opening
@@ -527,6 +537,16 @@ const UserMUIDPanel: React.FC<UserMUIDPanelProps> = ({
     [majik, setUID],
   );
 
+  const handleAuthSuccess = useCallback(
+    async (response: API_RESPONSE_SIGN_IN | API_RESPONSE_SIGN_UP) => {
+      setIsSigningIn(false);
+      if (!!response.user) {
+        await majik.refreshMUID();
+      }
+    },
+    [majik],
+  );
+
   // ── Sign out ───────────────────────────────────────────────────────────────
   const handleSignOut = useCallback(async () => {
     if (!majikah.isAuthenticated) return;
@@ -592,6 +612,14 @@ const UserMUIDPanel: React.FC<UserMUIDPanelProps> = ({
             </IconBtn>
           )}
 
+          {currentAccount && (
+            <IconBtn
+              onClick={() => setShowTaxProfileWizardModal(true)}
+              title="Setup Tax Profile"
+            >
+              <ScalesIcon size={13} />
+            </IconBtn>
+          )}
           {currentAccount && (
             <IconBtn
               onClick={() => setShowReplaceKeyModal(true)}
@@ -784,6 +812,19 @@ const UserMUIDPanel: React.FC<UserMUIDPanelProps> = ({
         majik={majik}
         isOpen={showEditMetaModal}
         onOpenChange={setShowEditMetaModal}
+      />
+
+      <TaxProfileSettingsModal
+        majik={majik}
+        onOpenChange={setShowTaxProfileWizardModal}
+        open={showTaxProfileWizardModal}
+      />
+
+      <MajikahAuthModal
+        onSuccessSignIn={handleAuthSuccess}
+        onSuccessSignUp={handleAuthSuccess}
+        open={isSigningIn}
+        onOpenChange={setIsSigningIn}
       />
 
       {/* Sign In modal */}

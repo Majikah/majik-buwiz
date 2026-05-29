@@ -43,6 +43,7 @@ interface DynamicSlidingDialogueProps {
   modal: {
     title: string;
     description: string;
+    hide?: boolean;
   };
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -68,6 +69,7 @@ const DynamicSlidingDialogue: React.FC<DynamicSlidingDialogueProps> = ({
   modal = {
     title: "Confirm Action",
     description: "Are you sure you want to proceed with this action?",
+    hide: true,
   },
   isOpen,
   onOpenChange,
@@ -104,15 +106,18 @@ const DynamicSlidingDialogue: React.FC<DynamicSlidingDialogueProps> = ({
             onPointerDownOutside={(e) => e.preventDefault()}
             onInteractOutside={(e) => e.preventDefault()}
           >
-            <StyledDialogTitle className="DialogTitle">
-              {modal.title}
-            </StyledDialogTitle>
-            <StyledDialogDescription className="DialogDescription">
-              {modal.description}
-            </StyledDialogDescription>
             <Drawer.Close asChild>
               <CloseButton onClick={handleOnCancel}>Close</CloseButton>
             </Drawer.Close>
+            <StyledDialogTitle className="DialogTitle" $hide={modal.hide}>
+              {modal.title}
+            </StyledDialogTitle>
+            <StyledDialogDescription
+              className="DialogDescription"
+              $hide={modal.hide}
+            >
+              {modal.description}
+            </StyledDialogDescription>
             {scrollable ? (
               <ScrollableForm
                 onClickCancel={handleOnCancel}

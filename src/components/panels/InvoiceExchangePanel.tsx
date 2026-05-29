@@ -474,7 +474,7 @@ export const InvoiceExchangePanel: React.FC<InvoiceExchangePanelProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const list = majik.listInvoices();
+      const list = await majik.listInvoicesByActiveAccount();
       setLocalInvoices(list);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load invoices");

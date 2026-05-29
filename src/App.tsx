@@ -68,6 +68,7 @@ import { AppDataSnapshot } from "./SDK/majik-buwiz-client/src/core/backup/types"
 import { ImportAppDataModal } from "./components/panels/modals/ImportAppDataModal";
 import { AppSettingsModal } from "./components/panels/settings/AppSettingsModal";
 import { ExportAccountKeyModal } from "./components/panels/muid/modals/ExportAccountKeyModal";
+import TaxProfileWizardModal from "./components/panels/contacts/modals/TaxProfileWizardModal";
 
 type ModalKeyContext =
   | "create-account"
@@ -88,6 +89,7 @@ type ModalKeyContext =
   | "auth-majikah"
   | "invoice-settings"
   | "user-preferences"
+  | "tax-profile-wizard"
   | null;
 
 const RootContainer = styled.div`
@@ -651,6 +653,17 @@ function App(): JSX.Element {
           setModalKey("user-preferences");
         }),
 
+        listen("trigger-tax-profile-wizard", () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+          setModalKey("tax-profile-wizard");
+        }),
+
         // ─────────────────────────────────────────────────────────────
         // Tools
         // ─────────────────────────────────────────────────────────────
@@ -706,7 +719,6 @@ function App(): JSX.Element {
     };
   }, [majik, majikah, dispatch, navigate, tour, userAccounts.length, unlocked]);
 
-  
   const handleCancel = (): void => {
     if (unlockResolver) unlockResolver("");
     setUnlockId(null);
@@ -747,6 +759,16 @@ function App(): JSX.Element {
       setIsUnlocking(false);
     }
   };
+
+  const handleForgotSuccess = useCallback(() => {
+    toast.success("Access granted", {
+      description: "Your identity has been securely unlocked.",
+    });
+
+    setUnlockId(null);
+    setUnlockResolver(null);
+    setUnlocked(true);
+  }, [majik]);
 
   const handleRefreshInstance = (data: MajikBuwizDatabase): void => {
     updateInstance(data);
@@ -870,6 +892,7 @@ function App(): JSX.Element {
           onSwitchAccount={handleSwitchAccount}
           onReset={handleCancel}
           isUnlocking={isUnlocking}
+          onForgotPasswordSuccess={handleForgotSuccess}
         />
 
         <AppSettingsModal
@@ -975,6 +998,14 @@ function App(): JSX.Element {
             setModalKey(change ? "invoice-settings" : null)
           }
           open={modalKey === "invoice-settings"}
+        />
+
+        <TaxProfileWizardModal
+          majik={majik}
+          onOpenChange={(change) =>
+            setModalKey(change ? "tax-profile-wizard" : null)
+          }
+          open={modalKey === "tax-profile-wizard"}
         />
 
         <CSVExportDialog

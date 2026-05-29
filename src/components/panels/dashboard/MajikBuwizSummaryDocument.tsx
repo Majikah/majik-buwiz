@@ -54,6 +54,10 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
 import { Asset_Logo_150px } from "@/assets";
+import {
+  renderBIRFormPage,
+  SupportedBIROutput,
+} from "./bir-forms/BIRFormPages";
 
 Font.registerHyphenationCallback((word) => [word]);
 
@@ -847,6 +851,8 @@ export interface MajikBuwizSummaryDocumentProps {
    * Name of the person/system that generated this report.
    */
   generatedBy?: string;
+
+  birOutput?: SupportedBIROutput;
 }
 
 // ---------------------------------------------------------------------------
@@ -932,7 +938,7 @@ const CoverPage: React.FC<{
             Majik Buwiz
           </Text>
           <Text style={{ fontSize: 8, color: C.brandMid, marginTop: 3 }}>
-            by Majikah Information Technology Solutions
+            by Majikah Solutions OPC
           </Text>
         </View>
       </View>
@@ -1080,7 +1086,7 @@ const CoverPage: React.FC<{
               color: C.brandMid,
             }}
           >
-            Majikah Information Technology Solutions
+            Majikah Solutions OPC
           </Text>
         </View>
       </View>
@@ -2107,7 +2113,7 @@ const AppendixPage: React.FC<{
 
 export const MajikBuwizSummaryDocument: React.FC<
   MajikBuwizSummaryDocumentProps
-> = ({ stats, currency = "PHP", period, business, generatedBy }) => {
+> = ({ stats, currency = "PHP", period, business, generatedBy, birOutput }) => {
   const generatedOn = new Date().toLocaleDateString("en-PH", {
     year: "numeric",
     month: "long",
@@ -2180,6 +2186,8 @@ export const MajikBuwizSummaryDocument: React.FC<
         generatedBy={generatedBy}
         footer={footer}
       />
+
+      {birOutput && renderBIRFormPage(birOutput)}
     </Document>
   );
 };

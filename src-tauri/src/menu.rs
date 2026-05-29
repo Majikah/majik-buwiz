@@ -18,9 +18,7 @@ pub fn build_menu(
         Some(AboutMetadata {
             name: Some("Majik Buwiz".into()),
             version: Some(env!("CARGO_PKG_VERSION").into()),
-            copyright: Some(
-                "© 2026 Majikah Information Technology Solutions. All rights reserved.".into(),
-            ),
+            copyright: Some("© 2026 Majikah Solutions OPC. All rights reserved.".into()),
             website: Some("https://buwiz.majikah.solutions".into()),
             icon: Some(app.default_window_icon().unwrap().clone()),
             license: Some("Apache 2.0".into()),
@@ -217,6 +215,14 @@ pub fn build_menu(
         None::<&str>,
     )?;
 
+    let tax_profile_wizard = MenuItem::with_id(
+        app,
+        "tax-profile-wizard",
+        "Tax Profile Wizard",
+        true,
+        None::<&str>,
+    )?;
+
     let preferences_menu = Submenu::with_items(
         app,
         "Preferences",
@@ -225,6 +231,8 @@ pub fn build_menu(
             &toggle_dark_mode,
             &PredefinedMenuItem::separator(app)?,
             &user_preferences,
+            &PredefinedMenuItem::separator(app)?,
+            &tax_profile_wizard,
         ],
     )?;
 
@@ -384,6 +392,10 @@ pub fn handle_menu_event(app: &AppHandle<tauri::Wry>, event_id: &str) {
 
         "user-preferences" => {
             let _ = app.emit("trigger-user-preferences", ());
+        }
+
+        "tax-profile-wizard" => {
+            let _ = app.emit("trigger-tax-profile-wizard", ());
         }
 
         // ── Tools ────────────────────────────────────────────────────────────

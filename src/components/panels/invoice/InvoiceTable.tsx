@@ -77,6 +77,20 @@ export interface InvoiceTableProps {
     invoices: MajikInvoice[],
   ) => void;
   onSelectionChange?: (invoices: MajikInvoice[]) => void;
+
+  /**
+   * When true (orphan/other-account view):
+   *   - Edit action is hidden
+   *   - Duplicate on encrypted invoices triggers onDecryptAndDuplicate
+   *   - Download (.mjki) action is shown
+   */
+  isReadOnly?: boolean;
+
+  /**
+   * Called instead of onDuplicate when isReadOnly=true and the invoice
+   * is encrypted — signals the parent to open the decrypt-and-duplicate modal.
+   */
+  onDecryptAndDuplicate?: (invoice: MajikInvoice) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +188,13 @@ const DEFAULT_COLUMNS: InvoiceColumnDef[] = [
     render: (inv) => {
       const name =
         inv.public?.issuerName ?? safeInvoice(inv)?.issuer?.legalName;
-      return <CellText data-private>{name ?? <Muted>—</Muted>}</CellText>;
+      const signer = inv.signerIds[0];
+      return (
+        <CellColumn>
+          <CellText data-private>{name ?? <Muted>—</Muted>}</CellText>
+          <Muted data-private>{signer ?? "—"}</Muted>
+        </CellColumn>
+      );
     },
   },
   {
@@ -203,9 +223,12 @@ const DEFAULT_COLUMNS: InvoiceColumnDef[] = [
     sortValue: (inv) =>
       `${inv.displayStatus} ${inv.isLocked ? "" : `- ${inv.status}`}`,
     render: (inv) => {
+      const effectiveStatus = inv.isLocked
+        ? inv.status
+        : inv.invoice.effectiveStatus;
       return (
-        <StatusBadge $color={statusColor(inv.status)} data-private>
-          {inv.status}
+        <StatusBadge $color={statusColor(effectiveStatus)} data-private>
+          {effectiveStatus}
         </StatusBadge>
       );
     },
@@ -548,6 +571,13 @@ const InvoiceNumber = styled.span`
   letter-spacing: 0.02em;
 `;
 
+const CellColumn = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+`;
+
 const CellText = styled.span`
   font-family: ${({ theme }) => theme.typography.fonts.medium};
   font-size: 13px;
@@ -845,6 +875,8 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
   onDuplicate,
   visibleColumnKeys,
   onSelectionChange,
+  isReadOnly = false,
+  onDecryptAndDuplicate,
 }) => {
   const [page, setPage] = useState(1);
   const [sortState, setSortState] = useState<SortState | null>(null);
@@ -1076,8 +1108,8 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
                         <EyeIcon size={14} />
                       </ActionBtn>
 
-                      {/* Edit — only for unsealed invoices */}
-                      {!inv.isSealed && (
+                      {/* Edit — hidden in read-only (other-account) view */}
+                      {!inv.isSealed && !isReadOnly && (
                         <ActionBtn
                           title="Edit"
                           onClick={() => onEdit?.(inv)}
@@ -1087,16 +1119,43 @@ export const InvoiceTable: React.FC<InvoiceTableProps> = ({
                         </ActionBtn>
                       )}
 
-                      {/* Duplicate  */}
-
+                      {/* Duplicate — always shown, but encrypted + read-only goes via modal */}
                       <ActionBtn
                         $variant="ghost"
-                        title="Duplicate as new draft"
-                        onClick={() => onDuplicate?.(inv)}
-                        disabled={!onDuplicate}
+                        title={
+                          isReadOnly && inv.isEncrypted
+                            ? "Decrypt with original key and duplicate"
+                            : "Duplicate as new draft"
+                        }
+                        onClick={() => {
+                          if (isReadOnly && inv.isEncrypted) {
+                            onDecryptAndDuplicate?.(inv);
+                          } else {
+                            onDuplicate?.(inv);
+                          }
+                        }}
+                        disabled={
+                          isReadOnly
+                            ? inv.isEncrypted
+                              ? !onDecryptAndDuplicate
+                              : !onDuplicate
+                            : !onDuplicate
+                        }
                       >
                         <CopySimpleIcon size={14} />
                       </ActionBtn>
+
+                      {/* Download (.mjki) — only in read-only view */}
+                      {isReadOnly && (
+                        <ActionBtn
+                          $variant="ghost"
+                          title="Download as .mjki"
+                          onClick={() => onBulkExport?.("mjki", [inv])}
+                          disabled={!onBulkExport}
+                        >
+                          <DownloadSimpleIcon size={14} />
+                        </ActionBtn>
+                      )}
 
                       {/* Delete — always available */}
                       <ActionBtn

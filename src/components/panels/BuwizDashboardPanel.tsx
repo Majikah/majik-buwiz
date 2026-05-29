@@ -51,11 +51,19 @@ import { MajikBuwizDatabase } from "../majik-context-wrapper/majik-buwiz-databas
 import GuideHelper from "../functional/GuideHelper";
 import { toast } from "sonner";
 import { BIRReturnType, getBIRFilingWindow } from "@/SDK/bir-tax-period";
-import { downloadMajikBuwizSummaryPDF } from "./invoice/MajikBuwizSummaryDocument";
+import { downloadMajikBuwizSummaryPDF } from "./dashboard/MajikBuwizSummaryDocument";
 import { CtrlBtn } from "@/globals/buttons";
 import DynamicPlaceholder from "../foundations/DynamicPlaceholder";
 import ChartRevenueTrend from "./dashboard/charts/ChartRevenueTrend";
 import ChartStatusDistribution from "./dashboard/charts/ChartStatusDistribution";
+
+import { computeTax } from "./dashboard/accounting-helper";
+import FilingConfigModal, {
+  FilingExportConfig,
+} from "./dashboard/modals/FilingConfigModal";
+import { SupportedBIROutput } from "./dashboard/bir-forms/BIRFormPages";
+import FilingSection from "./dashboard/FilingSection";
+import DynamicAlertBanner from "../foundations/DynamicAlertBanner";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -756,6 +764,8 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
 
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
+  const [filingConfigOpen, setFilingConfigOpen] = useState(false);
+
   const loadInvoices = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -838,7 +848,12 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
   const TABLE_COLS_4 = "1fr 100px 110px 110px";
   const TABLE_COLS_STATUS = "1fr 80px 120px 110px";
 
-  const handleExportPDF = async () => {
+  const handleExportPDF = useCallback(async () => {
+    if (dateMode === "filing") {
+      // Gate behind the config modal — the actual export runs in handleFilingConfigConfirm
+      setFilingConfigOpen(true);
+      return;
+    }
     const run = async (): Promise<string> => {
       setIsExporting(true);
       const defaults = await majik.getInvoiceDefaults();
@@ -868,7 +883,80 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
         err instanceof Error ? err.message : "PDF export failed.",
       finally: () => setIsExporting(false),
     });
-  };
+  }, [majik, dateMode]);
+
+  const taxpayerProfile = useMemo(() => {
+    const currentAccount = majik.getActiveAccount();
+    if (!currentAccount) return null;
+    return currentAccount.toBIRProfile();
+  }, [majik]);
+
+  const handleFilingConfigConfirm = useCallback(
+    async (filingConfig: FilingExportConfig) => {
+      const run = async (): Promise<string> => {
+        setIsExporting(true);
+
+        const defaults = await majik.getInvoiceDefaults();
+        const currentAccount = majik.getActiveAccount();
+        if (!currentAccount) throw new Error("Please setup your account first");
+
+        // Build the TaxpayerProfile from the account
+        const accountTaxProfile = currentAccount.toBIRProfile();
+        // const profile = {
+        //   ...accountTaxProfile,
+        //   entityType: "individual" as const,
+        //   taxRegime: "vat" as const,
+        //   taxRateElection: "graduated" as const,
+        //   deductionMethod: "osd" as const,
+        //   accountingMethod: "cash" as const,
+        //   functionalCurrency: defaults?.currency || "PHP",
+        //   vatRegistrationDate:
+        //     accountTaxProfile.vatRegistrationDate ?? "2022-01-01",
+        //   address: defaults?.issuer?.address,
+        //   email: defaults?.issuer?.email,
+        //   tradeName: defaults?.issuer?.tradeName,
+        // };
+
+        // Merge adapter config overrides from the modal into the adapter
+        // The computeTax helper respects adapterConfig passed via the override
+        // mechanism — we pass it through the config object.
+        const result = await computeTax({
+          activePreset,
+          birReturnType,
+          range,
+          invoices,
+          profile: accountTaxProfile,
+          currency,
+          adapterConfig: filingConfig.adapterConfig,
+          // expenses: [] — placeholder, wire up when ExpenseManager is ready
+          // Adapter config overrides are embedded in adapterConfigOverride below
+        });
+
+        // Export with BIR form appended
+        await downloadMajikBuwizSummaryPDF({
+          stats,
+          business: {
+            name: defaults?.issuer?.legalName || currentAccount.meta.legalName,
+            tagline: defaults?.tagline,
+            tin: defaults?.issuer?.tin || currentAccount.meta.tin,
+          },
+          period: { from: range.from, to: range.to, label: "Period" },
+          birOutput: result.output as SupportedBIROutput,
+        });
+
+        return `${result.description} — PDF exported successfully`;
+      };
+
+      toast.promise(run(), {
+        loading: "Computing tax and generating PDF…",
+        success: (m) => m,
+        error: (err) =>
+          err instanceof Error ? err.message : "PDF export failed.",
+        finally: () => setIsExporting(false),
+      });
+    },
+    [majik, stats, activePreset, birReturnType, range, invoices, currency],
+  );
 
   if (loading) {
     return (
@@ -902,7 +990,11 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
           </PanelSubtitle>
           <CtrlBtn onClick={handleExportPDF} disabled={isExporting}>
             <FilePdfIcon size={13} />
-            {isExporting ? "Exporting…" : "Export PDF"}
+            {isExporting
+              ? "Exporting…"
+              : dateMode === "filing"
+                ? "Export Filing Summary as PDF"
+                : "Export Summary as PDF"}
           </CtrlBtn>
         </HeaderLeft>
 
@@ -964,6 +1056,31 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
                   )}
                 </div>
               </Section>
+            )}
+
+            {dateMode === "filing" && (
+              <Section $delay={20}>
+                <SectionLabel>
+                  <WarningCircleIcon size={12} />
+                  Experimental Feature
+                </SectionLabel>
+                <DynamicAlertBanner
+                  level="warning"
+                  title="Experimental Tax Filing & Computation Feature"
+                  description="This filing generator and tax computation module is currently experimental and should only be used as a drafting or estimation tool. Generated values, tax mappings, calculations, and BIR form outputs may contain inaccuracies, omissions, or outdated interpretations of Philippine tax regulations. Always review and verify all generated data, computations, attachments, and filing requirements with a licensed CPA, accountant, or qualified tax/legal professional before submission to the BIR. The user remains fully responsible for validating compliance, accuracy, and final filed amounts."
+                />
+              </Section>
+            )}
+
+            {dateMode === "filing" && (
+              <FilingSection
+                activePreset={activePreset}
+                birReturnType={birReturnType}
+                range={range}
+                invoices={invoices}
+                profile={taxpayerProfile}
+                currency={currency}
+              />
             )}
 
             {/* ── Revenue at a Glance ── */}
@@ -1614,6 +1731,13 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
           </>
         )}
       </ScrollBody>
+      <FilingConfigModal
+        open={filingConfigOpen}
+        onOpenChange={setFilingConfigOpen}
+        birReturnType={birReturnType}
+        periodLabel={activePreset} // or derive a nice label from range
+        onConfirm={handleFilingConfigConfirm}
+      />
     </Root>
   );
 };

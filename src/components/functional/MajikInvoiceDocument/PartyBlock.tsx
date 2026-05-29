@@ -1,10 +1,56 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 import { EditableField } from "./EditableField";
 import { Party } from "@majikah/majik-invoice";
 import { PickContactModal } from "./modals/PickContactModal";
 import { MajikBuwizDatabase } from "@/components/majik-context-wrapper/majik-buwiz-database";
-import { AddressBookIcon } from "@phosphor-icons/react";
+import {
+  AddressBookIcon,
+  CheckIcon,
+  ClipboardIcon,
+  CopyIcon,
+} from "@phosphor-icons/react";
+import { toast } from "sonner";
+
+// ---------------------------------------------------------------------------
+// Clipboard helpers
+// ---------------------------------------------------------------------------
+
+const CLIPBOARD_PREFIX = "majik-buwiz-party:";
+
+function encodeParty(party: Party): string {
+  const json = JSON.stringify(party);
+  return CLIPBOARD_PREFIX + btoa(unescape(encodeURIComponent(json)));
+}
+
+function decodeParty(raw: string): Party | null {
+  try {
+    if (!raw.startsWith(CLIPBOARD_PREFIX)) return null;
+    const b64 = raw.slice(CLIPBOARD_PREFIX.length);
+    const json = decodeURIComponent(escape(atob(b64)));
+    const obj = JSON.parse(json);
+    // Shape validation — legalName is the only required field on Party
+    if (
+      typeof obj !== "object" ||
+      obj === null ||
+      typeof obj.legalName !== "string"
+    ) {
+      return null;
+    }
+    return obj as Party;
+  } catch {
+    return null;
+  }
+}
+
+async function readClipboardParty(): Promise<Party | null> {
+  try {
+    const text = await navigator.clipboard.readText();
+    return decodeParty(text);
+  } catch {
+    return null;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Styled
@@ -50,6 +96,37 @@ const FieldStack = styled.div`
   gap: 3px;
 `;
 
+const IconBtn = styled.button<{ $variant?: "default" | "accent" | "green" }>`
+  border: none;
+  background: transparent;
+  padding: 0 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: ${({ theme }) => theme.borders.radius.small};
+  flex-shrink: 0;
+  transition:
+    background ${({ theme }) => theme.animations.duration.short},
+    color ${({ theme }) => theme.animations.duration.short},
+    opacity ${({ theme }) => theme.animations.duration.short};
+
+  color: ${({ theme, $variant }) =>
+    $variant === "green" ? theme.colors.brand.green : theme.colors.primary};
+
+  opacity: 0.6;
+
+  &:hover {
+    opacity: 1;
+    background: ${({ theme, $variant }) =>
+      $variant === "green"
+        ? `${theme.colors.brand.green}18`
+        : theme.colors.primarySoft};
+  }
+`;
+
 const PickButton = styled.button`
   border: none;
   background: transparent;
@@ -66,6 +143,17 @@ const PickButton = styled.button`
   &:hover {
     opacity: 1;
   }
+`;
+
+// Sits before the ::after rule so it doesn't stretch the label row
+const LabelActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  /* Reset the uppercase/letter-spacing inherited from SectionLabel */
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
 `;
 
 // ---------------------------------------------------------------------------
@@ -85,6 +173,8 @@ interface PartyBlockProps {
 // Component
 // ---------------------------------------------------------------------------
 
+const CLIPBOARD_POLL_MS = 1500;
+
 const PartyBlockComponent: React.FC<PartyBlockProps> = ({
   majik,
   issuer,
@@ -94,6 +184,57 @@ const PartyBlockComponent: React.FC<PartyBlockProps> = ({
   onRecipientChange,
 }) => {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [clipboardParty, setClipboardParty] = useState<Party | null>(null);
+  const [copiedSide, setCopiedSide] = useState<"issuer" | "recipient" | null>(
+    null,
+  );
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Clipboard polling ────────────────────────────────────────────────────
+
+  const refreshClipboard = useCallback(async () => {
+    const party = await readClipboardParty();
+    setClipboardParty(party);
+  }, []);
+
+  useEffect(() => {
+    refreshClipboard();
+    pollRef.current = setInterval(refreshClipboard, CLIPBOARD_POLL_MS);
+
+    const onFocus = () => refreshClipboard();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshClipboard();
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [refreshClipboard]);
+
+  // ── Copy / Paste handlers ────────────────────────────────────────────────
+
+  const copyParty = async (side: "issuer" | "recipient") => {
+    const party = side === "issuer" ? issuer : recipient;
+    await navigator.clipboard.writeText(encodeParty(party));
+    setCopiedSide(side);
+    await refreshClipboard();
+    setTimeout(() => setCopiedSide(null), 1400);
+    toast.success(`${side === "issuer" ? "Issuer" : "Recipient"} copied`);
+  };
+
+  const pasteParty = (side: "issuer" | "recipient") => {
+    if (!clipboardParty) return;
+    const handler = side === "issuer" ? onIssuerChange : onRecipientChange;
+    handler(clipboardParty);
+    toast.success(`Pasted into ${side === "issuer" ? "Issuer" : "Recipient"}`);
+  };
+
+  const canPaste = clipboardParty !== null;
 
   return (
     <>
@@ -103,12 +244,20 @@ const PartyBlockComponent: React.FC<PartyBlockProps> = ({
           label="Issuer"
           readonly={readonly}
           onChange={onIssuerChange}
+          isCopied={copiedSide === "issuer"}
+          canPaste={canPaste}
+          onCopy={() => copyParty("issuer")}
+          onPaste={() => pasteParty("issuer")}
         />
         <PartyPane
           party={recipient}
           label="Bill to"
           readonly={readonly}
           onChange={onRecipientChange}
+          isCopied={copiedSide === "recipient"}
+          canPaste={canPaste}
+          onCopy={() => copyParty("recipient")}
+          onPaste={() => pasteParty("recipient")}
           onPickContact={readonly ? undefined : () => setPickerOpen(true)}
         />
       </PartiesGrid>
@@ -135,12 +284,54 @@ const PartyPane: React.FC<{
   label: string;
   readonly: boolean;
   onChange: (patch: Partial<Party>) => void;
-
-  onPickContact?: () => void; // ← add this
-}> = ({ party, label, readonly, onChange, onPickContact }) => (
+  isCopied: boolean;
+  canPaste: boolean;
+  onCopy: () => void;
+  onPaste: () => void;
+  onPickContact?: () => void;
+}> = ({
+  party,
+  label,
+  readonly,
+  onChange,
+  isCopied,
+  canPaste,
+  onCopy,
+  onPaste,
+  onPickContact,
+}) => (
   <PartyContainer>
     <SectionLabel>
       {label}
+
+      {/* ── Clipboard actions — copy always, paste when available ── */}
+      <LabelActions>
+        <IconBtn
+          type="button"
+          title={isCopied ? "Copied!" : `Copy ${label} to clipboard`}
+          onClick={onCopy}
+        >
+          {isCopied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+        </IconBtn>
+
+        <IconBtn
+          type="button"
+          $variant="green"
+          title={
+            canPaste
+              ? `Paste clipboard party into ${label}`
+              : "No copied party in clipboard"
+          }
+          onClick={onPaste}
+          disabled={!canPaste}
+          style={{
+            opacity: canPaste ? 0.7 : 0.25,
+            cursor: canPaste ? "pointer" : "default",
+          }}
+        >
+          <ClipboardIcon size={14} />
+        </IconBtn>
+      </LabelActions>
 
       {onPickContact && (
         <PickButton
@@ -153,6 +344,7 @@ const PartyPane: React.FC<{
         </PickButton>
       )}
     </SectionLabel>
+
     <FieldStack>
       <EditableField
         block
