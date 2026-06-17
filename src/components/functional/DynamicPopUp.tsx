@@ -42,6 +42,7 @@ interface DynamicPopUpProps {
   };
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
+  width?: number;
 }
 
 const DynamicPopUp: React.FC<DynamicPopUpProps> = ({
@@ -65,6 +66,7 @@ const DynamicPopUp: React.FC<DynamicPopUpProps> = ({
   },
   isOpen,
   onOpenChange,
+  width,
 }) => {
   const [internalOpen, setInternalOpen] = useState<boolean>(false);
 
@@ -86,7 +88,7 @@ const DynamicPopUp: React.FC<DynamicPopUpProps> = ({
       <AlertDialog.Root open={open} onOpenChange={setOpen}>
         <AlertDialog.Portal>
           <DialogOverlay />
-          <DialogContent>
+          <DialogContent $width={width}>
             <DialogHeader>
               <DialogTitle>{modal.title}</DialogTitle>
               <DialogDescription>{modal.description} </DialogDescription>

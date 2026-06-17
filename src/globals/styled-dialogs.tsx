@@ -19,6 +19,7 @@ export const DialogOverlay = styled(AlertDialog.Overlay)<{ $zOffset?: number }>`
 
 type DialogContentProps = React.ComponentPropsWithoutRef<typeof AlertDialog.Content> & {
   $zOffset?: number
+  $width?: number
 }
 
 export const DialogContent = styled(AlertDialog.Content)<DialogContentProps>`
@@ -30,7 +31,7 @@ export const DialogContent = styled(AlertDialog.Content)<DialogContentProps>`
   left: 50%;
   transform: translate(-50%, -50%);
   width: 100vw;
-  max-width: 600px;
+  max-width: ${({ $width }) => $width ?? 600}px;
   max-height: 100vh;
   padding: 25px 0px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);

@@ -57,6 +57,7 @@ import type { Form2550MFilingOutput } from "@/SDK/majik-buwiz-client/src/core/ac
 import type { Form2550QFilingOutput } from "@/SDK/majik-buwiz-client/src/core/accounting/adapters/forms/form-2550q";
 import type { Form2551QOutput } from "@/SDK/majik-buwiz-client/src/core/accounting/adapters/forms/form-2551q";
 import theme from "@/globals/theme";
+import { ExpenseRecord } from "@/SDK/majik-buwiz-client/src/core/expenses/expense-record";
 
 // ---------------------------------------------------------------------------
 // Formatters (local — same as dashboard)
@@ -1524,6 +1525,7 @@ export interface FilingSectionProps {
   birReturnType: BIRReturnType;
   range: DateRange;
   invoices: MajikInvoice[];
+  expenses: ExpenseRecord[];
   profile: TaxpayerProfile | null;
   currency: string;
 }
@@ -1537,6 +1539,7 @@ export const FilingSection: React.FC<FilingSectionProps> = ({
   birReturnType,
   range,
   invoices,
+  expenses,
   profile,
   currency,
 }) => {
@@ -1556,6 +1559,7 @@ export const FilingSection: React.FC<FilingSectionProps> = ({
         range.from.toISOString().slice(0, 10),
         range.to.toISOString().slice(0, 10),
         invoices.length,
+        expenses.length,
         profile?.tin ?? "",
       ].join("|"),
     [activePreset, birReturnType, range, invoices.length, profile],
@@ -1578,7 +1582,7 @@ export const FilingSection: React.FC<FilingSectionProps> = ({
           invoices,
           profile,
           currency,
-          expenses: [],
+          expenses,
         });
 
         // Discard stale result if a newer run started

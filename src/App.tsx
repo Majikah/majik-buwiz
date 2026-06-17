@@ -10,6 +10,7 @@ import {
   ReceiptIcon,
   IdentificationCardIcon,
   ChartLineUpIcon,
+  MoneyWavyIcon,
 } from "@phosphor-icons/react";
 import { useMajik } from "./components/majik-context-wrapper/use-majik";
 
@@ -69,6 +70,7 @@ import { ImportAppDataModal } from "./components/panels/modals/ImportAppDataModa
 import { AppSettingsModal } from "./components/panels/settings/AppSettingsModal";
 import { ExportAccountKeyModal } from "./components/panels/muid/modals/ExportAccountKeyModal";
 import TaxProfileWizardModal from "./components/panels/contacts/modals/TaxProfileWizardModal";
+import { ExpensesManager } from "./components/panels/expense/ExpensesManager";
 
 type ModalKeyContext =
   | "create-account"
@@ -79,8 +81,11 @@ type ModalKeyContext =
   | "import-invoice-mjki"
   | "import-invoice-csv"
   | "import-invoice-backup"
+  | "import-expense-mjki"
+  | "import-expense-backup"
   | "export-invoice-backup"
   | "export-invoice-csv"
+  | "export-expense-backup"
   | "export-contacts"
   | "export-backup"
   | "restore-backup"
@@ -313,6 +318,95 @@ function App(): JSX.Element {
             });
           }
         }),
+
+        listen("trigger-import-expense-mjki", async () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+          toast.error("Coming Soon", {
+            description:
+              "This feature will soon be available. Thank you for waiting.",
+            id: "toast-coming-soon",
+          });
+          // try {
+          //   const selected = await open({
+          //     multiple: true, // allow multi-file pick
+          //     filters: [{ name: "Majik Invoice", extensions: ["mjki", "*"] }],
+          //   });
+          //   if (!selected) return;
+
+          //   const paths = Array.isArray(selected) ? selected : [selected];
+
+          //   const parsed: MajikInvoice[] = [];
+          //   for (const filePath of paths) {
+          //     const uint8 = await readFile(filePath);
+          //     const invoice = MajikInvoice.fromBinary(uint8.buffer);
+          //     parsed.push(invoice);
+          //   }
+
+          //   if (parsed.length === 0) {
+          //     toast.error(
+          //       "No invoices could be parsed from the selected file(s).",
+          //     );
+          //     return;
+          //   }
+
+          //   setPendingImportInvoices(parsed);
+          //   setModalKey("import-invoice-mjki");
+          // } catch (error) {
+          //   console.error(error);
+          //   toast.error("Failed to open invoice file", {
+          //     description: (error as any)?.message || String(error),
+          //   });
+          // }
+        }),
+
+        listen("trigger-import-expense-backup", async () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+          toast.error("Coming Soon", {
+            description:
+              "This feature will soon be available. Thank you for waiting.",
+            id: "toast-coming-soon",
+          });
+          // try {
+          //   const selected = await open({
+          //     multiple: false,
+          //     filters: [{ name: "Majik Backup", extensions: ["mjkbackup"] }],
+          //   });
+          //   if (!selected) return;
+
+          //   const filePath = selected as string;
+          //   const uint8 = await readFile(filePath);
+
+          //   const invoices = await majik.readInvoicesBackup(uint8);
+
+          //   if (invoices.length === 0) {
+          //     toast.warning("Empty backup", {
+          //       description:
+          //         "No expenses were found in the selected backup file.",
+          //     });
+          //     return;
+          //   }
+
+          //   setPendingBackupInvoices(invoices);
+          //   setModalKey("import-expense-backup");
+          // } catch (error) {
+          //   console.error(error);
+          //   toast.error("Failed to read backup file", {
+          //     description: (error as any)?.message || String(error),
+          //   });
+          // }
+        }),
         listen("trigger-export-contacts", async () => {
           if (!unlocked) {
             toast.error("Account Locked", {
@@ -394,6 +488,57 @@ function App(): JSX.Element {
           const list = majik.listInvoices();
           setCsvInvoices(list);
           setModalKey("export-invoice-csv");
+        }),
+
+        listen("trigger-export-expenses-backup", async () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+          const backupBlob = majik.backupExpenses();
+          const blobBuffer = await backupBlob.arrayBuffer();
+
+          const backupFileName = `${activeAccount?.meta.label || activeAccount?.id || "User"}  - Expense Backup`;
+
+          const filePath = await save({
+            defaultPath: backupFileName,
+            filters: [{ name: "Majik Backup", extensions: ["mjkbackup"] }],
+          });
+
+          if (!filePath) {
+            toast.info("Backup cancelled");
+            return;
+          } else {
+            await writeFile(filePath, new Uint8Array(blobBuffer));
+          }
+
+          toast.success("Expense Backup Saved", {
+            description: `${backupFileName} exported successfully.`,
+          });
+
+          sendNotification({
+            title: "Expense Backup Saved",
+            body: backupFileName,
+          });
+        }),
+
+        listen("trigger-export-expenses-csv", async () => {
+          if (!unlocked) {
+            toast.error("Account Locked", {
+              description: "Unlock your Majik Key first.",
+              id: "toast-error-locked",
+            });
+            return;
+          }
+
+          toast.error("Coming Soon", {
+            description:
+              "This feature will soon be available. Thank you for waiting.",
+            id: "toast-coming-soon",
+          });
         }),
 
         listen("trigger-export-app-data", async () => {
@@ -855,6 +1000,14 @@ function App(): JSX.Element {
         name: "My Invoices",
         icon: ReceiptIcon,
         element: <InvoicesManager majik={majik} />,
+      },
+
+      {
+        id: "expenses",
+        route: "/expenses",
+        name: "My Expenses",
+        icon: MoneyWavyIcon,
+        element: <ExpensesManager majik={majik} />,
       },
 
       {

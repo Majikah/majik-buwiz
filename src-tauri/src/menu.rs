@@ -70,6 +70,23 @@ pub fn build_menu(
     let import_app_data =
         MenuItem::with_id(app, "import-app-data", "App Data", true, None::<&str>)?;
 
+    let import_expense_mjki =
+        MenuItem::with_id(app, "import-expense-mjki", "from MJKI", true, None::<&str>)?;
+
+    let import_expense_backup = MenuItem::with_id(
+        app,
+        "import-expense-backup",
+        "from Backup",
+        true,
+        None::<&str>,
+    )?;
+    let import_expense_submenu = Submenu::with_items(
+        app,
+        "Expense",
+        true,
+        &[&import_expense_mjki, &import_expense_backup],
+    )?;
+
     let import_file_submenu = Submenu::with_items(
         app,
         "Import",
@@ -77,6 +94,7 @@ pub fn build_menu(
         &[
             &import_contact_submenu,
             &import_invoice_submenu,
+            &import_expense_submenu,
             &import_app_data,
         ],
     )?;
@@ -94,13 +112,30 @@ pub fn build_menu(
         true,
         &[&export_invoices_backup, &export_invoices_csv],
     )?;
+
+    let export_expenses_backup =
+        MenuItem::with_id(app, "export-expenses-backup", "Backup", true, None::<&str>)?;
+    let export_expenses_csv =
+        MenuItem::with_id(app, "export-expenses-csv", "CSV", true, None::<&str>)?;
+    let export_expenses_submenu = Submenu::with_items(
+        app,
+        "Expenses",
+        true,
+        &[&export_expenses_backup, &export_expenses_csv],
+    )?;
+
     let export_app_data =
         MenuItem::with_id(app, "export-app-data", "App Data", true, None::<&str>)?;
     let export_submenu = Submenu::with_items(
         app,
         "Export",
         true,
-        &[&export_contacts, &export_invoices_submenu, &export_app_data],
+        &[
+            &export_contacts,
+            &export_invoices_submenu,
+            &export_expenses_submenu,
+            &export_app_data,
+        ],
     )?;
 
     let file_menu =
@@ -196,6 +231,26 @@ pub fn build_menu(
             &PredefinedMenuItem::separator(app)?,
             &export_invoices_submenu, // &PredefinedMenuItem::separator(app)?,
                                       // &generate_summary,
+        ],
+    )?;
+
+    // ── Expenses ────────────────────────────────────────────────────────
+    let manage_expenses = MenuItem::with_id(
+        app,
+        "manage-expenses",
+        "Manage Expenses",
+        true,
+        None::<&str>,
+    )?;
+
+    let expenses_menu = Submenu::with_items(
+        app,
+        "Expenses",
+        true,
+        &[
+            &manage_expenses,
+            &PredefinedMenuItem::separator(app)?,
+            &import_expense_submenu,
         ],
     )?;
     // ── Preferences ────────────────────────────────────────────────────────
@@ -307,6 +362,7 @@ pub fn build_menu(
             &file_menu,
             &account_menu,
             &invoices_menu,
+            &expenses_menu,
             &preferences_menu,
             &tools_menu,
             &help_menu,
@@ -327,6 +383,15 @@ pub fn handle_menu_event(app: &AppHandle<tauri::Wry>, event_id: &str) {
         "import-app-data" => {
             let _ = app.emit("trigger-import-app-data", ());
         }
+
+        "import-expense-mjki" => {
+            let _ = app.emit("trigger-import-expense-mjki", ());
+        }
+
+        "import-expense-backup" => {
+            let _ = app.emit("trigger-import-expense-backup", ());
+        }
+
         "export-contacts" => {
             let _ = app.emit("trigger-export-contacts", ());
         }
@@ -335,6 +400,13 @@ pub fn handle_menu_event(app: &AppHandle<tauri::Wry>, event_id: &str) {
         }
         "export-invoices-csv" => {
             let _ = app.emit("trigger-export-invoices-csv", ());
+        }
+
+        "export-expenses-backup" => {
+            let _ = app.emit("trigger-export-expenses-backup", ());
+        }
+        "export-expenses-csv" => {
+            let _ = app.emit("trigger-export-expenses-csv", ());
         }
         "export-app-data" => {
             let _ = app.emit("trigger-export-app-data", ());
@@ -383,6 +455,11 @@ pub fn handle_menu_event(app: &AppHandle<tauri::Wry>, event_id: &str) {
 
         "invoice-settings" => {
             let _ = app.emit("trigger-invoice-settings", ());
+        }
+
+        // ── Expenses ──────────────────────────────────────────────────────
+        "manage-expenses" => {
+            let _ = app.emit("trigger-manage-expenses", ());
         }
 
         // ── Preferences ──────────────────────────────────────────────────────

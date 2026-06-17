@@ -7,10 +7,14 @@ import {
   CheckIcon,
   ClipboardIcon,
   CopyIcon,
+  DotsThreeIcon,
   PlusIcon,
+  ScalesIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
 import { CopyPlusIcon } from "lucide-react";
+
+import DropDownMenu from "@/components/foundations/DropDownMenu";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -327,6 +331,8 @@ interface LineItemsTableProps {
   currency: string;
   canEdit: boolean;
   onChange: (items: LineItemInput[]) => void;
+  onEditTaxes?: (item: LineItemInput) => void;
+  useDropdown?: boolean; // ← new
 }
 
 // ---------------------------------------------------------------------------
@@ -340,6 +346,8 @@ const LineItemsTableComponent: React.FC<LineItemsTableProps> = ({
   currency,
   canEdit,
   onChange,
+  onEditTaxes,
+  useDropdown = false,
 }) => {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [clipboardItem, setClipboardItem] = useState<LineItemInput | null>(
@@ -445,20 +453,20 @@ const LineItemsTableComponent: React.FC<LineItemsTableProps> = ({
           <thead>
             <tr>
               <Th style={{ width: "28%" }}>Description</Th>
-              <Th style={{ width: "7%" }} $align="right">
+              <Th style={{ width: "6%" }} $align="right">
                 Qty
               </Th>
-              <Th style={{ width: "7%" }}>Unit</Th>
-              <Th style={{ width: "13%" }} $align="right">
+              <Th style={{ width: "6%" }}>Unit</Th>
+              <Th style={{ width: "12%" }} $align="right">
                 Unit price
               </Th>
-              <Th style={{ width: "10%" }} $align="center">
+              <Th style={{ width: "15%" }} $align="center">
                 Tax
               </Th>
-              <Th style={{ width: "10%" }} $align="center">
+              <Th style={{ width: "9%" }} $align="center">
                 Discount
               </Th>
-              <Th style={{ width: "13%" }} $align="right">
+              <Th style={{ width: "12%" }} $align="right">
                 Net total
               </Th>
               <Th style={{ width: "12%" }} $align="center">
@@ -535,6 +543,14 @@ const LineItemsTableComponent: React.FC<LineItemsTableProps> = ({
                           </TaxChip>
                         ))}
                       </div>
+                    ) : canEdit && onEditTaxes ? (
+                      <IconBtn
+                        type="button"
+                        title="Edit taxes for this item"
+                        onClick={() => onEditTaxes(item)}
+                      >
+                        <ScalesIcon size={13} />
+                      </IconBtn>
                     ) : (
                       <NoneChip>—</NoneChip>
                     )}
@@ -556,43 +572,92 @@ const LineItemsTableComponent: React.FC<LineItemsTableProps> = ({
 
                   {/* ── Actions column ── */}
                   <ActionsTd $align="center">
-                    <RowActions className="row-actions">
-                      {/* Copy — always available */}
-                      <IconBtn
-                        $variant="default"
-                        title="Copy line item to clipboard"
-                        onClick={() => copyItem(i)}
-                      >
-                        {copiedIndex === i ? (
-                          <CheckIcon size={14} />
-                        ) : (
-                          <CopyIcon size={14} />
+                    {useDropdown ? (
+                      <DropDownMenu
+                        trigger={{
+                          variant: "icon",
+                          icon: DotsThreeIcon,
+                          title: "Row actions",
+                        }}
+                        options={[
+                          {
+                            label: "Copy line item",
+                            icon: CopyIcon,
+                            onClick: () => copyItem(i),
+                          },
+
+                          {
+                            label: "Duplicate",
+                            icon: CopyPlusIcon,
+                            onClick: () => duplicateItem(i),
+                            hidden: !canEdit,
+                          },
+                          {
+                            label: "Edit taxes",
+                            icon: ScalesIcon,
+                            onClick: () => onEditTaxes?.(item),
+                            hidden: !canEdit || !onEditTaxes,
+                          },
+                          { type: "separator" },
+                          {
+                            label: "Delete",
+                            icon: TrashIcon,
+                            danger: true,
+                            strict: true,
+                            confirmTitle: "Delete this line item?",
+                            confirmDescription:
+                              "This will permanently remove the line item and cannot be undone.",
+                            onClick: () => removeItem(i),
+                          },
+                        ]}
+                      />
+                    ) : (
+                      <RowActions className="row-actions">
+                        {/* Copy — always available */}
+                        <IconBtn
+                          $variant="default"
+                          title="Copy line item to clipboard"
+                          onClick={() => copyItem(i)}
+                        >
+                          {copiedIndex === i ? (
+                            <CheckIcon size={14} />
+                          ) : (
+                            <CopyIcon size={14} />
+                          )}
+                        </IconBtn>
+
+                        {canEdit && (
+                          <IconBtn
+                            $variant="accent"
+                            title="Duplicate line item"
+                            onClick={() => duplicateItem(i)}
+                          >
+                            <CopyPlusIcon size={14} />
+                          </IconBtn>
                         )}
-                      </IconBtn>
 
-                      {/* Duplicate — only when canEdit */}
-                      {canEdit && (
-                        <IconBtn
-                          $variant="accent"
-                          title="Duplicate line item"
-                          onClick={() => duplicateItem(i)}
-                        >
-                          <CopyPlusIcon size={14} />
-                        </IconBtn>
-                      )}
+                        {canEdit && onEditTaxes && (
+                          <IconBtn
+                            type="button"
+                            title="Edit taxes for this item"
+                            onClick={() => onEditTaxes(item)}
+                          >
+                            <ScalesIcon size={13} />
+                          </IconBtn>
+                        )}
 
-                      {/* Delete — only when canEdit */}
-                      {canEdit && (
-                        <IconBtn
-                          $variant="danger"
-                          title="Remove line item"
-                          onClick={() => removeItem(i)}
-                          disabled={items.length <= 1}
-                        >
-                          <TrashIcon size={14} />
-                        </IconBtn>
-                      )}
-                    </RowActions>
+                        {canEdit && (
+                          <IconBtn
+                            $variant="danger"
+                            title="Remove line item"
+                            onClick={() => removeItem(i)}
+                            disabled={items.length <= 1}
+                          >
+                            <TrashIcon size={14} />
+                          </IconBtn>
+                        )}
+                      </RowActions>
+                    )}
                   </ActionsTd>
                 </Tr>
               );

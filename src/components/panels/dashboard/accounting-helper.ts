@@ -280,7 +280,7 @@ function periodLabel(period: FilingPeriod): string {
  *     invoices,
  *     profile,
  *     currency,
- *     expenses: [],   // placeholder — wire up later
+ *     expenses: [], 
  *   });
  *
  *   console.log(result.output);
@@ -296,7 +296,7 @@ export async function computeTax(
     invoices,
     profile,
     currency = "PHP",
-    expenses = [], // placeholder
+    expenses = [], 
     adapterConfig,
   } = input;
 

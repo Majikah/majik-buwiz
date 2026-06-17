@@ -312,6 +312,7 @@ type BaseEditableFieldProps = {
   onBlur?: () => void;
   onValidated?: (valid: boolean) => void;
   whitelist?: string[];
+  placeholder?: string;
 };
 
 type EditableFieldProps = BaseEditableFieldProps &
@@ -360,6 +361,7 @@ const EditableFieldComponent: React.FC<EditableFieldProps> = (props) => {
     onValidated,
     onBlur,
     whitelist,
+    placeholder,
   } = props;
 
   const rawValue = props.value;
@@ -539,7 +541,7 @@ const EditableFieldComponent: React.FC<EditableFieldProps> = (props) => {
           disabled={readonly}
           rows={props.rows ?? 3}
           style={props.inputStyle}
-          placeholder={isEmpty ? label : undefined}
+          placeholder={isEmpty ? placeholder || label : undefined}
           data-private
         />
       );
@@ -581,7 +583,7 @@ const EditableFieldComponent: React.FC<EditableFieldProps> = (props) => {
           disabled={readonly}
           rows={maxLines === 0 ? 3 : maxLines}
           style={(props as any).inputStyle}
-          placeholder={isEmpty ? label : undefined}
+          placeholder={isEmpty ? placeholder || label : undefined}
           data-private
         />
       );
@@ -600,7 +602,7 @@ const EditableFieldComponent: React.FC<EditableFieldProps> = (props) => {
         style={props.inputStyle}
         min={(props as any).min}
         max={(props as any).max}
-        placeholder={isEmpty ? label : undefined}
+        placeholder={isEmpty ? placeholder || label : undefined}
         data-private
       />
     );

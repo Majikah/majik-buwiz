@@ -64,6 +64,7 @@ import FilingConfigModal, {
 import { SupportedBIROutput } from "./dashboard/bir-forms/BIRFormPages";
 import FilingSection from "./dashboard/FilingSection";
 import DynamicAlertBanner from "../foundations/DynamicAlertBanner";
+import { ExpenseRecord } from "@/SDK/majik-buwiz-client/src/core/expenses/expense-record";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -759,6 +760,7 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
     useState<BIRReturnType>("income_quarterly");
 
   const [invoices, setInvoices] = useState<MajikInvoice[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [, setError] = useState<string | null>(null);
 
@@ -795,6 +797,14 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
         // const { decrypted } = await majik.decryptCachedInvoices();
         setInvoices(decrypted);
       }
+      const { items: expenses } = await majik.queryExpensesAdvanced({
+        publicKey: currentKey.fingerprint,
+        expenseDate: {
+          from: range.from.toISOString(),
+          to: range.to.toISOString(),
+        },
+      });
+      setExpenses(expenses);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load invoices");
     } finally {
@@ -900,6 +910,14 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
         const currentAccount = majik.getActiveAccount();
         if (!currentAccount) throw new Error("Please setup your account first");
 
+        const { items: expenses } = await majik.queryExpensesAdvanced({
+          publicKey: currentAccount.id,
+          expenseDate: {
+            from: range.from.toISOString(),
+            to: range.to.toISOString(),
+          },
+        });
+
         // Build the TaxpayerProfile from the account
         const accountTaxProfile = currentAccount.toBIRProfile();
         // const profile = {
@@ -928,7 +946,8 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
           profile: accountTaxProfile,
           currency,
           adapterConfig: filingConfig.adapterConfig,
-          // expenses: [] — placeholder, wire up when ExpenseManager is ready
+          expenses: expenses,
+
           // Adapter config overrides are embedded in adapterConfigOverride below
         });
 
@@ -1080,6 +1099,7 @@ export const BuwizDashboardPanel: React.FC<BuwizDashboardPanelProps> = ({
                 invoices={invoices}
                 profile={taxpayerProfile}
                 currency={currency}
+                expenses={expenses}
               />
             )}
 

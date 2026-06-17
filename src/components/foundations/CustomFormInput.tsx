@@ -316,6 +316,8 @@ export interface CustomFormInputProps {
   useToggle?: boolean;
 
   hideCharLimit?: boolean;
+
+  autoFocus?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -340,6 +342,7 @@ export const CustomFormInput: React.FC<CustomFormInputProps> = ({
   layout = "stack",
   useToggle = false,
   hideCharLimit = false,
+  autoFocus = false,
 }) => {
   const uid = useId();
   const fieldId = idProp ?? uid;
@@ -564,6 +567,7 @@ export const CustomFormInput: React.FC<CustomFormInputProps> = ({
         maxLength={maxChar > 0 ? maxChar : undefined}
         rows={4}
         data-private
+        autoFocus={autoFocus}
       />
     );
 
@@ -640,6 +644,7 @@ export const CustomFormInput: React.FC<CustomFormInputProps> = ({
                 disabled={disabled}
                 $hasError={hasError}
                 $hasToggle={false}
+                autoFocus={autoFocus}
                 {...(type === "number" ? { min: 0, step: "any" } : {})}
                 data-private
               />
@@ -679,6 +684,7 @@ export const CustomFormInput: React.FC<CustomFormInputProps> = ({
           disabled={disabled}
           $hasError={hasError}
           $hasToggle={false}
+          autoFocus={autoFocus}
           {...(type === "number" ? { min: 0, step: "any" } : {})}
           data-private
         />
